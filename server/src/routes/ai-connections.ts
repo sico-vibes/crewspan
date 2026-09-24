@@ -142,6 +142,7 @@ export async function validateAiApiKey(
     anthropic: "https://api.anthropic.com/v1/models?limit=1",
     openai: "https://api.openai.com/v1/models",
     openrouter: "https://openrouter.ai/api/v1/key",
+    "opencode-go": "https://opencode.ai/zen/go/v1/chat/completions",
     xai: "https://api.x.ai/v1/models",
   };
   let response: Response;
@@ -149,16 +150,26 @@ export async function validateAiApiKey(
     response = await request(endpoints[provider], {
       redirect: "error",
       signal: AbortSignal.timeout(15000),
+      ...(provider === "opencode-go"
+        ? {
+            method: "POST",
+            // Go checks auth before request validation. Empty messages and zero
+            // output deliberately fail validation without starting a model run.
+            body: JSON.stringify({ model: "glm-5.3-flash", messages: [], max_tokens: 0 }),
+          }
+        : {}),
       headers:
         provider === "anthropic"
           ? { "x-api-key": key, "anthropic-version": "2023-06-01" }
-          : { Authorization: `Bearer ${key}` },
+          : provider === "opencode-go"
+            ? { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }
+            : { Authorization: `Bearer ${key}` },
     });
   } catch {
     throw unprocessable("Could not verify the account. Try again.");
   }
   await response.body?.cancel();
-  if (!response.ok)
+  if (!response.ok && !(provider === "opencode-go" && (response.status === 400 || response.status === 422)))
     throw unprocessable(
       response.status === 401 || response.status === 403
         ? "The provider rejected this API key."

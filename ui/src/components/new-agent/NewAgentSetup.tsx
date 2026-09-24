@@ -148,6 +148,14 @@ function Setup({
       ? { provider: "openrouter", method: "api_key", mode: "responsible_user" }
       : undefined,
   );
+  useEffect(() => {
+    if (brandType !== "opencode_local" || !model) return;
+    const required = aiProviderForAdapter(brandType, model);
+    if (!required) return;
+    setRuntimeAiBinding((current) => current?.provider === required ? current : {
+      provider: required, method: "api_key", mode: "responsible_user",
+    });
+  }, [brandType, model]);
   const [connection, setConnection] = useState<ProviderConnection | null>(null);
   const aiBinding = runtimeAiBinding ?? connection?.aiConnection;
   const [repository, setRepository] = useState("");

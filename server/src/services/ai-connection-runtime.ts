@@ -29,6 +29,7 @@ export const AI_AUTH_ENV_KEYS = [
   "OPENAI_API_KEY",
   "CODEX_API_KEY",
   "OPENROUTER_API_KEY",
+  "OPENCODE_API_KEY",
   "XAI_API_KEY",
   "GROK_API_KEY",
   "CODEX_HOME",
@@ -266,9 +267,9 @@ export async function prepareManagedAiRuntime(
         mode: 0o600,
       });
     }
-    if (input.binding.provider === "openrouter") {
+    if (input.binding.provider === "openrouter" || input.binding.provider === "opencode-go") {
       env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
-        provider: { openrouter: { options: { apiKey: value } } },
+        provider: { [input.binding.provider]: { options: { apiKey: value } } },
       });
       env.OPENCODE_DISABLE_PROJECT_CONFIG = "true";
     }

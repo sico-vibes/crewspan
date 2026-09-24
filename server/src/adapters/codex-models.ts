@@ -1,4 +1,7 @@
 import type { AdapterModel } from "./types.js";
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { models as codexFallbackModels } from "@paperclipai/adapter-codex-local";
 import { readConfigFile } from "../config-file.js";
 
@@ -29,6 +32,33 @@ function mergedWithFallback(models: AdapterModel[]): AdapterModel[] {
     ...models,
     ...codexFallbackModels,
   ]).sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true, sensitivity: "base" }));
+}
+
+// The Codex subscription does not provide an OPENAI_API_KEY, so /v1/models is
+// unavailable in the common local setup. Codex keeps its account's current
+// model catalog here; use only the public selector fields, never model prompts.
+async function readCodexCliModels(): Promise<AdapterModel[]> {
+  const codexHome = process.env.CODEX_HOME?.trim() || join(homedir(), ".codex");
+  try {
+    const raw = JSON.parse(await readFile(join(codexHome, "models_cache.json"), "utf8")) as {
+      models?: unknown;
+    };
+    if (!Array.isArray(raw.models)) return [];
+    return dedupeModels(raw.models.flatMap((entry: unknown) => {
+      if (!entry || typeof entry !== "object") return [];
+      const model = entry as Record<string, unknown>;
+      if (model.visibility !== "list" || model.supported_in_api === false) return [];
+      if (typeof model.slug !== "string" || !/^[a-z0-9][a-z0-9._-]*$/i.test(model.slug)) return [];
+      return [{
+        id: model.slug,
+        label: typeof model.display_name === "string" && model.display_name.trim()
+          ? model.display_name.trim()
+          : model.slug,
+      }];
+    }));
+  } catch {
+    return [];
+  }
 }
 
 function resolveOpenAiApiKey(): string | null {
@@ -74,7 +104,8 @@ async function loadCodexModels(options?: { forceRefresh?: boolean }): Promise<Ad
   const forceRefresh = options?.forceRefresh === true;
   const apiKey = resolveOpenAiApiKey();
   const fallback = dedupeModels(codexFallbackModels);
-  if (!apiKey) return fallback;
+  const cliModels = await readCodexCliModels();
+  if (!apiKey) return cliModels.length > 0 ? mergedWithFallback(cliModels) : fallback;
 
   const now = Date.now();
   const keyFingerprint = fingerprint(apiKey);
@@ -84,7 +115,7 @@ async function loadCodexModels(options?: { forceRefresh?: boolean }): Promise<Ad
 
   const fetched = await fetchOpenAiModels(apiKey);
   if (fetched.length > 0) {
-    const merged = mergedWithFallback(fetched);
+    const merged = mergedWithFallback([...cliModels, ...fetched]);
     cached = {
       keyFingerprint,
       expiresAt: now + OPENAI_MODELS_CACHE_TTL_MS,
@@ -97,7 +128,7 @@ async function loadCodexModels(options?: { forceRefresh?: boolean }): Promise<Ad
     return cached.models;
   }
 
-  return fallback;
+  return cliModels.length > 0 ? mergedWithFallback(cliModels) : fallback;
 }
 
 export async function listCodexModels(): Promise<AdapterModel[]> {

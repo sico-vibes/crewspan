@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtemp, rmdir, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { models as claudeFallbackModels } from "@paperclipai/adapter-claude-local";
 import { resetClaudeModelsCacheForTests } from "@paperclipai/adapter-claude-local/server";
 import { models as codexFallbackModels } from "@paperclipai/adapter-codex-local";
@@ -17,7 +20,9 @@ vi.mock("acpx/runtime", () => ({
 }));
 
 describe("adapter model listing", () => {
+  const originalCodexHome = process.env.CODEX_HOME;
   beforeEach(() => {
+    process.env.CODEX_HOME = join(tmpdir(), "paperclip-no-codex-model-cache");
     delete process.env.OPENAI_API_KEY;
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.ANTHROPIC_BASE_URL;
@@ -30,6 +35,11 @@ describe("adapter model listing", () => {
     setCursorModelsRunnerForTests(null);
     resetOpenCodeModelsCacheForTests();
     vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    if (originalCodexHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = originalCodexHome;
   });
 
   it("returns an empty list for unknown adapters", async () => {
@@ -55,6 +65,23 @@ describe("adapter model listing", () => {
     expect(models.some((model) => model.id === "gpt-5.6-luna")).toBe(true);
     expect(models.some((model) => model.id === "gpt-5.3-codex-spark")).toBe(false);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("lists current Codex subscription models from the local CLI catalog", async () => {
+    const home = await mkdtemp(join(tmpdir(), "paperclip-codex-models-"));
+    try {
+      process.env.CODEX_HOME = home;
+      await writeFile(join(home, "models_cache.json"), JSON.stringify({ models: [
+        { slug: "gpt-6-luna", display_name: "GPT-6-Luna", visibility: "list", supported_in_api: true },
+        { slug: "gpt-reserve", display_name: "Reserve", visibility: "hide", supported_in_api: true },
+      ] }));
+      const models = await listAdapterModels("codex_local");
+      expect(models).toContainEqual({ id: "gpt-6-luna", label: "GPT-6-Luna" });
+      expect(models.some((model) => model.id === "gpt-reserve")).toBe(false);
+    } finally {
+      await unlink(join(home, "models_cache.json"));
+      await rmdir(home);
+    }
   });
 
   it("returns claude fallback models including the latest Opus alias when no Anthropic key is available", async () => {

@@ -23,7 +23,9 @@ import {
 
 export function aiProviderForAdapter(
   adapterType: string,
+  model?: string,
 ): AiProvider | undefined {
+  if (adapterType === "opencode_local" && model?.startsWith("opencode-go/")) return "opencode-go";
   return (
     {
       claude_local: "anthropic",
@@ -56,7 +58,7 @@ export function AiConnectionField({
   legacy?: boolean;
   readOnly?: boolean;
 }) {
-  const provider = aiProviderForAdapter(adapterType);
+  const provider = aiProviderForAdapter(adapterType, model);
   const returnFocus = useRef<HTMLElement | null>(null);
   const restoreFocus = (event: Event) => { event.preventDefault(); returnFocus.current?.focus(); };
   const [adopting, setAdopting] = useState(false);
@@ -74,7 +76,7 @@ export function AiConnectionField({
   });
   const method: AiAuthMethod = (value?.mode !== "responsible_user" ? value?.method : undefined)
     ?? accounts.data?.connections.find((account) => account.provider === provider && account.isDefault)?.method
-    ?? (provider === "openrouter" ? "api_key" : "subscription");
+    ?? (provider === "openrouter" || provider === "opencode-go" ? "api_key" : "subscription");
   if (!provider) return null;
   if (legacy && !value && !adopting)
     return (

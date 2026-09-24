@@ -21,6 +21,7 @@ The shared `AI_CONNECTION_CAPABILITIES` contract defines these combinations:
 | Claude / Anthropic | Claude subscription token or Anthropic API key | Claude |
 | OpenAI | ChatGPT/Codex subscription or OpenAI API key | Codex |
 | OpenRouter | API key | OpenCode, with an `openrouter/` model |
+| OpenCode Go | API key | OpenCode, with an `opencode-go/` model |
 | Grok / xAI | Grok subscription or xAI API key | Grok |
 
 Native runner supports the corresponding existing Codex, OpenCode, and Claude

@@ -463,6 +463,8 @@ describe("managed AI connections", () => {
     expect(isAiConnectionCompatible(binding, "paperclip_runner", "same-model", "acpx", "claude")).toBe(true);
     expect(isAiConnectionCompatible(binding, "paperclip_runner", "same-model", "acpx", "codex")).toBe(false);
     expect(isAiConnectionCompatible({ provider: "openrouter", method: "api_key" }, "opencode_local", "anthropic/model")).toBe(false);
+    expect(isAiConnectionCompatible({ provider: "opencode-go", method: "api_key" }, "opencode_local", "opencode-go/gpt-6-luna")).toBe(true);
+    expect(isAiConnectionCompatible({ provider: "opencode-go", method: "api_key" }, "opencode_local", "openrouter/gpt-6-luna")).toBe(false);
   });
   it("does not let a forged delegation bypass human access or accept an expired subscription attempt", async () => {
     const selected = await service.select({ ...input, userId: "alice" });
@@ -612,6 +614,18 @@ describe("managed AI connections", () => {
     const request = vi.fn().mockResolvedValue(new Response("secret-provider-body", { status: 401 }));
     await expect(validateAiApiKey("anthropic", "fixture", request)).rejects.toThrow("rejected");
     expect(request.mock.calls[0][1].redirect).toBe("error");
+  });
+  it("verifies OpenCode Go credentials against OpenCode Go, not OpenRouter", async () => {
+    const request = vi.fn().mockResolvedValue(new Response(null, { status: 400 }));
+    await validateAiApiKey("opencode-go", "fixture", request);
+    expect(request).toHaveBeenCalledWith("https://opencode.ai/zen/go/v1/chat/completions", expect.objectContaining({
+      redirect: "error",
+      method: "POST",
+      body: JSON.stringify({ model: "glm-5.3-flash", messages: [], max_tokens: 0 }),
+      headers: { Authorization: "Bearer fixture", "Content-Type": "application/json" },
+    }));
+    request.mockResolvedValueOnce(new Response(null, { status: 401 }));
+    await expect(validateAiApiKey("opencode-go", "invalid", request)).rejects.toThrow("rejected");
   });
   it("uses the authenticated responsible user for agent-originated configuration and tests", async () => {
     const req = { actor: { type: "agent", agentId, onBehalfOfUserId: "alice" } } as express.Request;

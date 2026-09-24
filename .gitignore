@@ -18,6 +18,10 @@ coverage/
 .LSOverride
 data/
 .paperclip/
+# Local instance home used by Start-M0.ps1. Holds the embedded DB, workspaces,
+# and agent-jwt-secret.txt, so it must never be committed. Tracked here (not
+# only in .git/info/exclude) so a fresh clone of this fork is protected too.
+.paperclip-home/
 .pnpm-store/
 tmp-*
 cli/tmp/
