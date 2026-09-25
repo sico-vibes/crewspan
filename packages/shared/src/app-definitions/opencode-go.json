@@ -3,29 +3,51 @@
   "slug": "opencode-go",
   "name": "OpenCode Go",
   "description": "Connect an OpenCode Go account for OpenCode agents.",
-  "categories": ["ai"],
-  "branding": { "logoUrl": "/brands/opencode-logo-light-square.svg", "darkLogoUrl": "/brands/opencode-logo-dark-square.svg" },
-  "urlPatterns": ["https://opencode.ai/zen/go/*"],
-  "methods": [{
-    "key": "ai-api_key",
-    "label": "OpenCode Go API key",
-    "purpose": "ai",
-    "transport": "runtime_auth",
-    "auth": "api_key",
-    "ai": { "provider": "opencode-go", "method": "api_key" },
-    "grantKinds": ["user", "organization"],
-    "ownershipModes": ["customer"],
-    "whenToUse": "Authenticate an OpenCode agent with this account.",
-    "guidanceMd": "Use your personal account or an explicitly shared company account.",
-    "riskTier": "S3",
-    "credentialFields": [{
-      "key": "apiKey",
-      "label": "API key",
-      "type": "password",
-      "required": true,
-      "placeholder": "Enter API key",
-      "secret": true
-    }],
-    "keyPlacement": { "location": "env", "name": "OPENCODE_API_KEY" }
-  }]
+  "categories": [
+    "ai"
+  ],
+  "branding": {
+    "logoUrl": "/brands/apps/opencode-go.svg",
+    "darkLogoUrl": "/brands/apps/opencode-go-dark.svg"
+  },
+  "urlPatterns": [
+    "https://opencode.ai/zen/go/*"
+  ],
+  "methods": [
+    {
+      "key": "ai-api_key",
+      "label": "OpenCode Go API key",
+      "purpose": "ai",
+      "transport": "runtime_auth",
+      "auth": "api_key",
+      "ai": {
+        "provider": "opencode-go",
+        "method": "api_key"
+      },
+      "grantKinds": [
+        "user",
+        "organization"
+      ],
+      "ownershipModes": [
+        "customer"
+      ],
+      "whenToUse": "Authenticate an OpenCode agent with this account.",
+      "guidanceMd": "Use your personal account or an explicitly shared company account.",
+      "riskTier": "S3",
+      "credentialFields": [
+        {
+          "key": "apiKey",
+          "label": "API key",
+          "type": "password",
+          "required": true,
+          "placeholder": "Enter API key",
+          "secret": true
+        }
+      ],
+      "keyPlacement": {
+        "location": "env",
+        "name": "OPENCODE_API_KEY"
+      }
+    }
+  ]
 }

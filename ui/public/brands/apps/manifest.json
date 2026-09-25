@@ -21,6 +21,12 @@
       "darkAsset": "/brands/apps/anthropic-dark.svg"
     },
     {
+      "slug": "arcade",
+      "provider": "Arcade",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/arcade.png"
+    },
+    {
       "slug": "asana",
       "provider": "Asana",
       "catalogVisible": true,
@@ -84,9 +90,15 @@
       "localAsset": "/brands/apps/coda.svg"
     },
     {
+      "slug": "cognee",
+      "provider": "Cognee",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/cognee.png"
+    },
+    {
       "slug": "composio",
       "provider": "Composio",
-      "catalogVisible": false,
+      "catalogVisible": true,
       "localAsset": "/brands/apps/composio.svg",
       "darkAsset": "/brands/apps/composio-dark.svg"
     },
@@ -117,6 +129,18 @@
       "localAsset": "/brands/apps/embat.svg"
     },
     {
+      "slug": "executor",
+      "provider": "Executor",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/executor.png"
+    },
+    {
+      "slug": "fireflies",
+      "provider": "Fireflies",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/fireflies.svg"
+    },
+    {
       "slug": "github",
       "provider": "GitHub",
       "catalogVisible": true,
@@ -128,30 +152,6 @@
       "provider": "Gmail",
       "catalogVisible": true,
       "localAsset": "/brands/apps/gmail.svg"
-    },
-    {
-      "slug": "google-sheets",
-      "provider": "Google Sheets",
-      "catalogVisible": true,
-      "localAsset": "/brands/apps/google-sheets.svg"
-    },
-    {
-      "slug": "google-drive",
-      "provider": "Google Drive",
-      "catalogVisible": true,
-      "localAsset": "/brands/apps/google-drive.svg"
-    },
-    {
-      "slug": "google-docs",
-      "provider": "Google Docs",
-      "catalogVisible": true,
-      "localAsset": "/brands/apps/google-docs.svg"
-    },
-    {
-      "slug": "google-slides",
-      "provider": "Google Slides",
-      "catalogVisible": true,
-      "localAsset": "/brands/apps/google-slides.svg"
     },
     {
       "slug": "google-calendar",
@@ -169,6 +169,18 @@
       "localAsset": "/brands/apps/google-chat.svg"
     },
     {
+      "slug": "google-docs",
+      "provider": "Google Docs",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/google-docs.svg"
+    },
+    {
+      "slug": "google-drive",
+      "provider": "Google Drive",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/google-drive.svg"
+    },
+    {
       "slug": "google-people",
       "provider": "Google People",
       "catalogVisible": true,
@@ -176,6 +188,18 @@
       "aliases": [
         "google contacts"
       ]
+    },
+    {
+      "slug": "google-sheets",
+      "provider": "Google Sheets",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/google-sheets.svg"
+    },
+    {
+      "slug": "google-slides",
+      "provider": "Google Slides",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/google-slides.svg"
     },
     {
       "slug": "google-workspace-search",
@@ -187,12 +211,34 @@
       ]
     },
     {
+      "slug": "honcho",
+      "provider": "Honcho",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/honcho.svg"
+    },
+    {
       "slug": "hugging-face",
       "provider": "Hugging Face",
       "catalogVisible": true,
       "localAsset": "/brands/apps/hugging-face.svg",
       "aliases": [
         "huggingface"
+      ]
+    },
+    {
+      "slug": "imessage-photon",
+      "provider": "iMessage Photon",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/imessage-photon.png"
+    },
+    {
+      "slug": "jam-dev",
+      "provider": "Jam.dev",
+      "catalogVisible": false,
+      "localAsset": "/brands/apps/jam-dev.svg",
+      "darkAsset": "/brands/apps/jam-dev-dark.svg",
+      "aliases": [
+        "jam"
       ]
     },
     {
@@ -241,6 +287,15 @@
       "localAsset": "/brands/apps/mem0.svg"
     },
     {
+      "slug": "microsoft-teams",
+      "provider": "Microsoft Teams",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/microsoft-teams.svg",
+      "aliases": [
+        "teams"
+      ]
+    },
+    {
       "slug": "miro",
       "provider": "Miro",
       "catalogVisible": true,
@@ -254,15 +309,6 @@
       "darkAsset": "/brands/apps/mixpanel-dark.svg"
     },
     {
-      "slug": "microsoft-teams",
-      "provider": "Microsoft Teams",
-      "catalogVisible": true,
-      "localAsset": "/brands/apps/microsoft-teams.svg",
-      "aliases": [
-        "teams"
-      ]
-    },
-    {
       "slug": "netlify",
       "provider": "Netlify",
       "catalogVisible": true,
@@ -274,6 +320,27 @@
       "provider": "Notion",
       "catalogVisible": true,
       "localAsset": "/brands/apps/notion.svg"
+    },
+    {
+      "slug": "openai",
+      "provider": "OpenAI",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/openai.svg",
+      "darkAsset": "/brands/apps/openai-dark.svg"
+    },
+    {
+      "slug": "opencode-go",
+      "provider": "OpenCode Go",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/opencode-go.svg",
+      "darkAsset": "/brands/apps/opencode-go-dark.svg"
+    },
+    {
+      "slug": "openrouter",
+      "provider": "OpenRouter",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/openrouter.svg",
+      "darkAsset": "/brands/apps/openrouter-dark.svg"
     },
     {
       "slug": "oreilly",
@@ -306,6 +373,13 @@
       "provider": "Postman",
       "catalogVisible": true,
       "localAsset": "/brands/apps/postman.svg"
+    },
+    {
+      "slug": "railway",
+      "provider": "Railway",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/railway.svg",
+      "darkAsset": "/brands/apps/railway-dark.svg"
     },
     {
       "slug": "razorpay",
@@ -367,6 +441,12 @@
       "localAsset": "/brands/apps/supabase.svg"
     },
     {
+      "slug": "supermemory",
+      "provider": "Supermemory",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/supermemory.png"
+    },
+    {
       "slug": "telegram",
       "provider": "Telegram",
       "catalogVisible": true,
@@ -412,10 +492,24 @@
       "darkAsset": "/brands/apps/wix-dark.svg"
     },
     {
+      "slug": "xai",
+      "provider": "Grok",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/xai.svg",
+      "darkAsset": "/brands/apps/xai-dark.svg"
+    },
+    {
       "slug": "xero",
       "provider": "Xero",
       "catalogVisible": false,
       "localAsset": "/brands/apps/xero.svg"
+    },
+    {
+      "slug": "youcom",
+      "provider": "You.com",
+      "catalogVisible": true,
+      "localAsset": "/brands/apps/youcom.svg",
+      "darkAsset": "/brands/apps/youcom-dark.svg"
     },
     {
       "slug": "zapier",
@@ -424,41 +518,10 @@
       "localAsset": "/brands/apps/zapier.svg"
     },
     {
-      "slug": "openai",
-      "provider": "OpenAI",
+      "slug": "zep",
+      "provider": "Zep",
       "catalogVisible": true,
-      "localAsset": "/brands/apps/openai.svg",
-      "darkAsset": "/brands/apps/openai-dark.svg"
-    },
-    {
-      "slug": "openrouter",
-      "provider": "OpenRouter",
-      "catalogVisible": true,
-      "localAsset": "/brands/apps/openrouter.svg",
-      "darkAsset": "/brands/apps/openrouter-dark.svg"
-    },
-    {
-      "slug": "xai",
-      "provider": "Grok",
-      "catalogVisible": true,
-      "localAsset": "/brands/apps/xai.svg",
-      "darkAsset": "/brands/apps/xai-dark.svg"
-    },
-    {
-      "slug": "imessage-photon",
-      "provider": "iMessage Photon",
-      "catalogVisible": true,
-      "localAsset": "/brands/apps/imessage-photon.png"
-    },
-    {
-      "slug": "jam-dev",
-      "provider": "Jam.dev",
-      "catalogVisible": false,
-      "localAsset": "/brands/apps/jam-dev.svg",
-      "darkAsset": "/brands/apps/jam-dev-dark.svg",
-      "aliases": [
-        "jam"
-      ]
+      "localAsset": "/brands/apps/zep.png"
     }
   ]
 }

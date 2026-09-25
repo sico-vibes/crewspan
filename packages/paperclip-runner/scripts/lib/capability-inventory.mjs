@@ -82,7 +82,12 @@ export function encodeInventory(value) {
 }
 
 export function decodeInventory(source) {
-  const json = source.startsWith(sourceHeader) ? source.slice(sourceHeader.length) : source;
+  // Git on Windows may check out these generated JSON inventories with CRLF.
+  // Normalize before matching the LF-only header so the header is not parsed as JSON.
+  const normalizedSource = source.replace(/\r\n/g, "\n");
+  const json = normalizedSource.startsWith(sourceHeader)
+    ? normalizedSource.slice(sourceHeader.length)
+    : normalizedSource;
   return JSON.parse(json);
 }
 
