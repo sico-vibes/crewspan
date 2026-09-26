@@ -3,6 +3,7 @@ import {
   type AttachmentArtifactWorkProductMetadata,
   type IssueWorkProduct,
 } from "@paperclipai/shared";
+import { withDeploymentBase } from "@/lib/deployment-base";
 
 /**
  * Helpers + selectors for the issue Output surface (PAP-10162 Phase 3).
@@ -292,7 +293,12 @@ export function getIssueOutputs(workProducts: IssueWorkProduct[] | null | undefi
       status: typeof wp.status === "string" ? wp.status : "active",
       isPrimary: Boolean(wp.isPrimary),
       createdAt: wp.createdAt,
-      metadata: parsed.success ? parsed.data : null,
+      metadata: parsed.success ? {
+        ...parsed.data,
+        contentPath: withDeploymentBase(parsed.data.contentPath),
+        openPath: withDeploymentBase(parsed.data.openPath),
+        downloadPath: withDeploymentBase(parsed.data.downloadPath),
+      } : null,
       degraded: !parsed.success,
       workProduct: wp,
     }];

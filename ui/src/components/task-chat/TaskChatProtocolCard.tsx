@@ -21,6 +21,7 @@ import {
 import { MarkdownBody } from "@/components/MarkdownBody";
 import type { MentionOption } from "@/components/MarkdownEditor";
 import { WorkspaceFileLink } from "@/components/WorkspaceFileLink";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -571,7 +572,7 @@ function WorkspaceFileCard({ item }: { item: TaskChatWorkspaceFileItem }) {
             <img
               className="max-h-(--sz-70vh) max-w-full object-contain"
               alt={item.displayName}
-              src={item.preview}
+              src={withDeploymentBase(item.preview)}
             />
           ) : (
             <pre className="max-h-(--sz-70vh) overflow-auto whitespace-pre-wrap rounded-sm bg-muted/50 p-3 font-mono text-xs">

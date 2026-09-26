@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { StatusIcon } from "../StatusIcon";
 import { Identity } from "../Identity";
 import { HighlightedText, type HighlightedTextProps } from "./HighlightedText";
+import { withDeploymentBase } from "@/lib/deployment-base";
 
 type SnippetStyle = {
   Icon: ComponentType<SVGProps<SVGSVGElement>>;
@@ -147,7 +148,7 @@ function SearchResultRowImpl({
           {updated ? <span className="text-xs tabular-nums text-muted-foreground">{updated}</span> : null}
           {result.previewImageUrl ? (
             <img
-              src={result.previewImageUrl}
+              src={withDeploymentBase(result.previewImageUrl)}
               alt=""
               loading="lazy"
               decoding="async"
@@ -220,7 +221,7 @@ function SearchResultRowImpl({
           ) : null}
           {previewImageUrl ? (
             <img
-              src={previewImageUrl}
+              src={withDeploymentBase(previewImageUrl)}
               alt=""
               loading="lazy"
               decoding="async"

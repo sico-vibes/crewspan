@@ -5,6 +5,9 @@
 // reloads parked tabs onto the fresh bundle. Left as the literal placeholder in
 // dev, where HMR (not the worker) drives refreshes.
 const BUILD_ID = "__PAPERCLIP_BUILD_ID__";
+// The worker is served under the deployment base (e.g. /crewspan/sw.js), so derive the
+// base from this script's own path instead of assuming the domain root.
+const BASE = self.location.pathname.replace(/\/sw\.js$/, "");
 // Separate this allowlisted cache from older workers that cached arbitrary URLs.
 const CACHE_NAME = `paperclip-public-assets-${BUILD_ID}`;
 const privateRequests = new Set();
@@ -36,12 +39,13 @@ self.addEventListener("fetch", (event) => {
   // Only immutable Vite build assets have a public offline-cache contract.
   // Never infer that application/extension responses are public from absent
   // headers, or from an in-memory classification lost when this worker restarts.
+  const basePattern = BASE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const publicAsset = url.origin === self.location.origin && !url.search &&
-    /^\/assets\/[^/]+-[a-zA-Z0-9_-]{8,}\.[a-zA-Z0-9.]+$/.test(url.pathname);
+    new RegExp(`^${basePattern}/assets/[^/]+-[a-zA-Z0-9_-]{8,}\\.[a-zA-Z0-9.]+$`).test(url.pathname);
 
   // Explicitly private requests must bypass BOTH cache writes and offline
   // fallback, including extension endpoints outside the host /api namespace.
-  if (request.method !== "GET" || url.pathname.startsWith("/api")) {
+  if (request.method !== "GET" || url.pathname.startsWith(`${BASE}/api`)) {
     return;
   }
   if (request.cache === "no-store") {

@@ -1,5 +1,6 @@
 import { getPageVisibility, getVisibilityHeaderValue } from "@/lib/page-visibility";
 import { tenantSessionRecovery } from "@/lib/tenant-session-recovery";
+import { deploymentApiUrl } from "@/lib/deployment-base";
 
 const BASE = "/api";
 
@@ -50,7 +51,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   applyObservabilityHeaders(headers);
 
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(deploymentApiUrl(`${BASE}${path}`), {
     headers,
     credentials: "include",
     ...init,

@@ -103,4 +103,11 @@ describe("ui branding", () => {
     expect(defaultHtml).toContain('href="/favicon.svg"');
     expect(defaultHtml).not.toContain('name="paperclip-worktree-name"');
   });
+
+  it("keeps default favicons under the base inferred from the built entry asset", () => {
+    const subpathHtml = TEMPLATE.replace("</head>", '<script type="module" src="/crewspan/assets/index-abc123.js"></script></head>');
+    const branded = applyUiBranding(subpathHtml, {});
+    expect(branded).toContain('href="/crewspan/favicon.svg"');
+    expect(branded).not.toContain('href="/favicon.svg"');
+  });
 });

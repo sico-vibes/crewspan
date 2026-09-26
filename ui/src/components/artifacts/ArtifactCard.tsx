@@ -3,6 +3,7 @@ import { Download, ExternalLink, Paperclip, Play } from "lucide-react";
 import type { CompanyArtifact } from "@/api/artifacts";
 import { Link } from "@/lib/router";
 import { cn, formatDate } from "@/lib/utils";
+import { withDeploymentBase } from "@/lib/deployment-base";
 
 interface ArtifactCardProps {
   artifact: CompanyArtifact;
@@ -42,7 +43,7 @@ function ImagePreview({ artifact }: { artifact: PreviewArtifact }) {
   return (
     <PreviewFrame>
       <img
-        src={artifact.contentPath}
+        src={withDeploymentBase(artifact.contentPath)}
         alt={artifact.title}
         loading="lazy"
         className="h-full w-full object-cover"
@@ -113,7 +114,7 @@ function VideoPreview({ artifact }: { artifact: PreviewArtifact }) {
   return (
     <PreviewFrame className="bg-black">
       <video
-        src={artifact.contentPath}
+        src={withDeploymentBase(artifact.contentPath)}
         preload="metadata"
         muted
         playsInline

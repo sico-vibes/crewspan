@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { BOOTSTRAP_FALLBACK_COMMAND } from "@/bootstrapSetup";
 import type { AuthSession } from "@paperclipai/shared";
 import { Card } from "@/components/ui/card";
+import { withDeploymentBase } from "@/lib/deployment-base";
 
 type BootstrapPendingPageProps = {
   claimAvailable: boolean;
@@ -110,7 +111,7 @@ export function BootstrapPendingPage({
         </div>
         <div className="mt-5">
           <Button asChild variant="outline">
-            <a href="/">Continue to dashboard</a>
+            <a href={withDeploymentBase("/")}>Continue to dashboard</a>
           </Button>
         </div>
       </StateChrome>

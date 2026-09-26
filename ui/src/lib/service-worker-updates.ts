@@ -84,7 +84,7 @@ export function startServiceWorkerUpdates(
   const intervalId = setInterval(checkForUpdates, updateIntervalMs);
 
   void container
-    .register("/sw.js")
+    .register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL })
     .then((reg) => {
       registration = reg;
     })

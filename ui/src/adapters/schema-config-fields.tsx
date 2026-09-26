@@ -1,5 +1,6 @@
 import { schemaFieldSection } from "./config-sections";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { deploymentApiUrl } from "@/lib/deployment-base";
 
 import type { AdapterConfigSchema, ConfigFieldSchema, CreateConfigValues } from "@paperclipai/adapter-utils";
 
@@ -218,7 +219,7 @@ async function fetchConfigSchema(adapterType: string): Promise<AdapterConfigSche
 
   const promise = (async () => {
     try {
-      const res = await fetch(`/api/adapters/${encodeURIComponent(adapterType)}/config-schema`);
+      const res = await fetch(deploymentApiUrl(`/api/adapters/${encodeURIComponent(adapterType)}/config-schema`));
       if (!res.ok) {
         failedSchemaTypes.add(adapterType);
         return null;

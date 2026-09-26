@@ -16,6 +16,8 @@ export type LocalAppBrandAssets = {
   dark?: string;
 };
 
+import { withDeploymentBase } from "@/lib/deployment-base";
+
 let manifestPromise: Promise<AppBrandManifest> | null = null;
 
 function normalizedProviderKey(value: string): string {
@@ -45,7 +47,7 @@ function isLocalAssetPath(value: unknown): value is string {
 
 async function loadManifest(): Promise<AppBrandManifest> {
   if (!manifestPromise) {
-    manifestPromise = fetch("/brands/apps/manifest.json", { credentials: "same-origin" })
+    manifestPromise = fetch(withDeploymentBase("/brands/apps/manifest.json"), { credentials: "same-origin" })
       .then(async (response) => {
         if (!response.ok) throw new Error(`App brand manifest request failed (${response.status})`);
         const value: unknown = await response.json();
@@ -72,8 +74,8 @@ export function resolveLocalAppBrandAssets(
   );
   if (!provider || !isLocalAssetPath(provider.localAsset)) return null;
   return {
-    light: provider.localAsset,
-    dark: isLocalAssetPath(provider.darkAsset) ? provider.darkAsset : provider.localAsset,
+    light: withDeploymentBase(provider.localAsset),
+    dark: withDeploymentBase(isLocalAssetPath(provider.darkAsset) ? provider.darkAsset : provider.localAsset),
   };
 }
 

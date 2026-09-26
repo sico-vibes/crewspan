@@ -1,5 +1,6 @@
 import type { IssueAttachment } from "@paperclipai/shared";
 import { isMarkdownAttachmentContent } from "@paperclipai/shared";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import { isImageLikeOutput, isVideoLikeOutput } from "./issue-output";
 
 type AttachmentPathLike = {
@@ -17,11 +18,11 @@ export function attachmentFilename(attachment: Pick<IssueAttachment, "id" | "ori
 }
 
 export function attachmentOpenPath(attachment: AttachmentPathLike) {
-  return attachment.openPath ?? attachment.contentPath;
+  return withDeploymentBase(attachment.openPath ?? attachment.contentPath);
 }
 
 export function attachmentDownloadPath(attachment: AttachmentPathLike) {
-  return attachment.downloadPath ?? `${attachment.contentPath}?download=1`;
+  return withDeploymentBase(attachment.downloadPath ?? `${attachment.contentPath}?download=1`);
 }
 
 export function isImageAttachment(attachment: Pick<IssueAttachment, "contentType"> & Partial<Pick<IssueAttachment, "originalFilename">>) {

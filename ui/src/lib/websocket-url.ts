@@ -16,5 +16,9 @@ export function buildSameOriginWebSocketUrl(
 ): string {
   const protocol = location.protocol === "https:" ? "wss" : "ws";
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${protocol}://${browserReachableHost(location)}${normalizedPath}`;
+  // Prefix the deployment base so a subpath deployment reaches its own WebSocket routes
+  // (nginx strips the base before forwarding to the server). Empty base is a no-op.
+  const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+  const withBase = !base || normalizedPath.startsWith(`${base}/`) ? normalizedPath : `${base}${normalizedPath}`;
+  return `${protocol}://${browserReachableHost(location)}${withBase}`;
 }

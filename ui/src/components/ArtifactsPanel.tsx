@@ -5,6 +5,7 @@ import { issuesApi } from "../api/issues";
 import { queryKeys } from "../lib/queryKeys";
 import { MarkdownBody } from "./MarkdownBody";
 import { cn } from "../lib/utils";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import {
   FileText,
   ExternalLink,
@@ -186,7 +187,7 @@ export function ArtifactsPanel({ taskId, isAgentWorking, openDocKey, openDocTitl
                     if (wp.type === "document") {
                       setViewingDoc({ key: "plan", title: wp.title });
                     } else if (wp.url) {
-                      window.open(wp.url, "_blank", "noopener,noreferrer");
+                      window.open(withDeploymentBase(wp.url), "_blank", "noopener,noreferrer");
                     }
                   }}
                 >

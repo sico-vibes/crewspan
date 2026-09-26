@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "../lib/utils";
+import { withDeploymentBase } from "@/lib/deployment-base";
 
 const BAYER_4X4 = [
   [0, 8, 2, 10],
@@ -172,7 +173,7 @@ export function CompanyPatternIcon({
     >
       {logo ? (
         <img
-          src={logo}
+          src={withDeploymentBase(logo)}
           alt={`${companyName} logo`}
           onError={() => setImageError(true)}
           className={cn(

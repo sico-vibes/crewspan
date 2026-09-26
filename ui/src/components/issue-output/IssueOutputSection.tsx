@@ -11,6 +11,7 @@ import {
 import { OutputPrimaryCard } from "./OutputPrimaryCard";
 import { OutputRow } from "./OutputRow";
 import { cn, relativeTime } from "@/lib/utils";
+import { withDeploymentBase } from "@/lib/deployment-base";
 
 interface IssueOutputSectionProps {
   workProducts: IssueWorkProduct[] | null | undefined;
@@ -49,7 +50,7 @@ function OutputMediaPreview({
     <>
       {isVideo ? (
         <video
-          src={meta.contentPath}
+          src={withDeploymentBase(meta.contentPath)}
           className="h-full w-full object-cover"
           muted
           playsInline
@@ -57,7 +58,7 @@ function OutputMediaPreview({
         />
       ) : (
         <img
-          src={meta.contentPath}
+          src={withDeploymentBase(meta.contentPath)}
           alt={filename}
           className="h-full w-full object-cover"
           loading="lazy"

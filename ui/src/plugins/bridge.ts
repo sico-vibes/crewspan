@@ -35,6 +35,7 @@ import type {
 } from "@paperclipai/shared";
 import { pluginsApi } from "@/api/plugins";
 import { ApiError } from "@/api/client";
+import { deploymentApiUrl, withDeploymentBase } from "@/lib/deployment-base";
 import { useToastActions, type ToastInput } from "@/context/ToastContext";
 import { useSidebar } from "@/context/SidebarContext";
 import { isGlobalPath, normalizeCompanyPrefix } from "@/lib/company-routes";
@@ -509,7 +510,7 @@ export function useHostNavigation(): HostNavigation {
       const href = resolveHref(to);
       const sameOriginPath = sameOriginPathFromHref(href);
       if (sameOriginPath === null) {
-        window.location.assign(href);
+        window.location.assign(withDeploymentBase(href));
         return;
       }
       routerNavigate(sameOriginPath, options as NavigateOptions | undefined);
@@ -621,7 +622,7 @@ export function usePluginStream<T = unknown>(
 
     const params = new URLSearchParams({ companyId: effectiveCompanyId });
     const source = new EventSource(
-      `/api/plugins/${encodeURIComponent(pluginId)}/bridge/stream/${encodeURIComponent(channel)}?${params.toString()}`,
+      deploymentApiUrl(`/api/plugins/${encodeURIComponent(pluginId)}/bridge/stream/${encodeURIComponent(channel)}?${params.toString()}`),
       { withCredentials: true },
     );
     sourceRef.current = source;

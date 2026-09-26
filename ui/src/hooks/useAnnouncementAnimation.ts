@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import { ANNOUNCEMENT_ANIMATION_CSP, type Announcement } from "@paperclipai/shared";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
@@ -15,7 +16,7 @@ export function useAnnouncementAnimation(announcement: Announcement, previewSrc?
     const timeout = setTimeout(() => controller.abort(), 5000);
     void (async () => {
       try {
-        const response = await fetch(src, {
+        const response = await fetch(withDeploymentBase(src), {
           credentials: "same-origin", cache: "no-store", redirect: "error",
           referrerPolicy: "no-referrer", signal: controller.signal,
         });

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAnnouncementAnimation } from "@/hooks/useAnnouncementAnimation";
+import { withDeploymentBase } from "@/lib/deployment-base";
 
 export interface AnnouncementCardProps {
   announcement: Announcement;
@@ -44,7 +45,7 @@ export function AnnouncementCard({ announcement, onDismiss, imageSrc, animationS
       }}
     >
       {(showImage || animationDocument) && <div className="relative h-(--announcement-image-mobile-height) w-full shrink-0 overflow-hidden bg-muted md:h-(--announcement-image-height)">
-        {showImage && <img src={src} alt={showAnimation ? "" : announcement.image!.alt} referrerPolicy="no-referrer" onError={() => setFailedImage(src)} className="h-full w-full object-cover" />}
+        {showImage && <img src={withDeploymentBase(src)} alt={showAnimation ? "" : announcement.image!.alt} referrerPolicy="no-referrer" onError={() => setFailedImage(src)} className="h-full w-full object-cover" />}
         {showAnimation && <div role="img" aria-label={announcement.animation!.alt} className="pointer-events-none absolute inset-0">
           <iframe title={announcement.animation!.alt} aria-hidden="true" tabIndex={-1} sandbox="" referrerPolicy="no-referrer" srcDoc={animationDocument!} className="h-full w-full border-0" />
         </div>}

@@ -10,6 +10,9 @@ import { readBrowserBuildCommit } from "./src/lib/vite-build-commit";
 const apiProxy = createApiProxy();
 
 export default defineConfig(({ mode }) => ({
+  // Deployment base path. "/" for a root deployment; set PAPERCLIP_UI_BASE=/crewspan/
+  // to serve the SPA under a reverse-proxy subpath (matching PAPERCLIP_AUTH_PUBLIC_BASE_URL).
+  base: process.env.PAPERCLIP_UI_BASE || "/",
   define: {
     __PAPERCLIP_BUILD_COMMIT__: JSON.stringify(
       readBrowserBuildCommit(__dirname),

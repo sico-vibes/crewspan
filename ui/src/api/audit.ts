@@ -1,4 +1,5 @@
 import { tenantSessionRecovery } from "@/lib/tenant-session-recovery";
+import { deploymentApiUrl } from "@/lib/deployment-base";
 import { api } from "./client";
 
 /**
@@ -106,7 +107,7 @@ export const auditApi = {
     const search = buildAuditQuery(filters);
     const qs = search.toString();
     const res = await fetch(
-      `/api/companies/${companyId}/audit/agent-actions.csv${qs ? `?${qs}` : ""}`,
+      deploymentApiUrl(`/api/companies/${companyId}/audit/agent-actions.csv${qs ? `?${qs}` : ""}`),
       { credentials: "include", headers: { Accept: "text/csv" } },
     );
     if (!res.ok) {

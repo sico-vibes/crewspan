@@ -1,3 +1,4 @@
+import "./lib/deployment-base";
 import * as React from "react";
 import { StrictMode } from "react";
 import * as ReactDOM from "react-dom";
@@ -66,7 +67,7 @@ getOrCreatePaperclipReactRoot(window, rootElement).render(
       <QueryClientProvider client={queryClient}>
         <SentryGate />
         <ThemeProvider>
-          <BrowserRouter>
+          <BrowserRouter basename={(import.meta.env.BASE_URL || "/").replace(/\/$/, "")}>
             <CompanyProvider>
               <EditorAutocompleteProvider>
                 <ToastProvider>

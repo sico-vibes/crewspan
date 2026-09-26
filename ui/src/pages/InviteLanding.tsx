@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AGENT_ADAPTER_TYPES } from "@paperclipai/shared";
 import type { AgentAdapterType, JoinRequest } from "@paperclipai/shared";
 import { Button } from "@/components/ui/button";
+import { deploymentApiUrl } from "@/lib/deployment-base";
 import { CompanyPatternIcon } from "@/components/CompanyPatternIcon";
 import { useCompany } from "@/context/CompanyContext";
 import { Link, useNavigate, useParams } from "@/lib/router";
@@ -710,7 +711,7 @@ export function InviteLandingPage() {
                 <form
                   className="space-y-4"
                   method="post"
-                  action={authMode === "sign_up" ? "/api/auth/sign-up/email" : "/api/auth/sign-in/email"}
+                  action={deploymentApiUrl(authMode === "sign_up" ? "/api/auth/sign-up/email" : "/api/auth/sign-in/email")}
                   onSubmit={(event) => {
                     event.preventDefault();
                     if (authMutation.isPending) return;

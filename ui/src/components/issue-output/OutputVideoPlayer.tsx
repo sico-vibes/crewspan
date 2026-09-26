@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { withDeploymentBase } from "@/lib/deployment-base";
 
 interface OutputVideoPlayerProps {
   src: string;
@@ -20,7 +21,7 @@ export function OutputVideoPlayer({ src, poster, className, title }: OutputVideo
   return (
     <div className={cn("relative w-full overflow-hidden rounded-md bg-black aspect-video", className)}>
       <video
-        src={src}
+        src={withDeploymentBase(src)}
         poster={poster ?? undefined}
         controls
         preload="metadata"

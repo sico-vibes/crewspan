@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "@/lib/router";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   Agent,
@@ -2100,10 +2101,10 @@ export function ApplySuccess({
         </div>
       )}
       <ul className="space-y-1 text-sm">
-        <li><a className="text-primary hover:underline" href="/agents/all">View imported agents →</a></li>
-        <li><a className="text-primary hover:underline" href="/projects">View imported projects →</a></li>
-        <li><a className="text-primary hover:underline" href="/routines">View routines →</a></li>
-        <li><a className="text-primary hover:underline" href="/activity">View activity log →</a></li>
+        <li><a className="text-primary hover:underline" href={withDeploymentBase("/agents/all")}>View imported agents →</a></li>
+        <li><a className="text-primary hover:underline" href={withDeploymentBase("/projects")}>View imported projects →</a></li>
+        <li><a className="text-primary hover:underline" href={withDeploymentBase("/routines")}>View routines →</a></li>
+        <li><a className="text-primary hover:underline" href={withDeploymentBase("/activity")}>View activity log →</a></li>
       </ul>
       <div className="flex justify-end">
         <Button onClick={onClose}>Done</Button>

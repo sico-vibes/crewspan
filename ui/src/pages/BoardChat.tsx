@@ -33,6 +33,7 @@ import {
 import { cn, formatDateTime } from "../lib/utils";
 import type { FeedbackVoteValue } from "@paperclipai/shared";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { deploymentApiUrl, withDeploymentBase } from "@/lib/deployment-base";
 
 /**
  * Board Concierge Chat — a chat interface powered by the board-member skill.
@@ -547,7 +548,7 @@ export function BoardChat() {
       try {
         const controller = new AbortController();
         const fetchTimeout = setTimeout(() => controller.abort(), 130000);
-        const res = await fetch("/api/board/chat/stream", {
+        const res = await fetch(deploymentApiUrl("/api/board/chat/stream"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -892,7 +893,7 @@ export function BoardChat() {
               {/* Status bar — always visible while sending, independent from the chat bubble */}
               {sending && (
                 <div className="flex items-center gap-2 pl-1 text-xs text-muted-foreground">
-                  <img src="/paperclip-thinking.svg" alt="" className="inline-block shrink-0" style={{ width: 14, height: 14 }} />
+                  <img src={withDeploymentBase("/paperclip-thinking.svg")} alt="" className="inline-block shrink-0" style={{ width: 14, height: 14 }} />
                   <span>{statusText || "Thinking..."}</span>
                   {elapsedSec > 0 && (
                     <span className="opacity-50">{elapsedSec.toFixed(1)}s</span>

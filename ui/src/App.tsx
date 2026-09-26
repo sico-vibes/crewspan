@@ -111,6 +111,7 @@ import { filterHiddenInstanceSettingsPath, normalizeRememberedInstanceSettingsPa
 import { useCloudInstance } from "./hooks/useCloudInstance";
 import { useStreamlinedUiEnabled } from "./hooks/useStreamlinedUiEnabled";
 import { cloudStackCreateUrl } from "./lib/cloudLinks";
+import { applyCompanyPrefix } from "@/lib/company-routes";
 import { navigateTopLevel } from "@/lib/browserNavigation";
 
 const CompanyExport = lazy(() =>
@@ -509,16 +510,16 @@ function LegacySettingsRedirect() {
     return <NoCompaniesStartPage />;
   }
 
-  const normalizedPath = filterHiddenInstanceSettingsPath(
-    normalizeRememberedInstanceSettingsPath(
-      `${location.pathname}${location.search}${location.hash}`,
-    ),
-    hiddenSettings,
-  );
+  const requestedPath = `${location.pathname}${location.search}${location.hash}`;
+  const settingsPath =
+    location.pathname === "/company/settings" || location.pathname.startsWith("/company/settings/")
+      ? requestedPath
+      : normalizeRememberedInstanceSettingsPath(requestedPath);
+  const normalizedPath = filterHiddenInstanceSettingsPath(settingsPath, hiddenSettings);
 
   return (
     <Navigate
-      to={`/${targetCompany.issuePrefix}${normalizedPath}`}
+      to={applyCompanyPrefix(normalizedPath, targetCompany.issuePrefix)}
       replace
     />
   );
@@ -765,6 +766,7 @@ export function App() {
           <Route path="instance" element={<LegacySettingsRedirect />} />
           <Route path="instance/settings" element={<LegacySettingsRedirect />} />
           <Route path="instance/settings/*" element={<LegacySettingsRedirect />} />
+          <Route path="company/settings/*" element={<LegacySettingsRedirect />} />
           <Route path="companies" element={<UnprefixedBoardRedirect />} />
           <Route path="issues" element={<UnprefixedBoardRedirect />} />
           <Route path="tasks" element={<UnprefixedBoardRedirect />} />

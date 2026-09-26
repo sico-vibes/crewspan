@@ -1,4 +1,5 @@
 import { AgentCharacter } from "../AgentCharacter";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import { useState } from "react";
 import { MotionConfig } from "motion/react";
 
@@ -48,12 +49,12 @@ const MODEL_SOURCES: ModelSource[] = [
   {
     id: "claude_local",
     label: "Claude Code",
-    icon: <img src="/brands/claude-color.svg" alt="" className="size-full" />,
+    icon: <img src={withDeploymentBase("/brands/claude-color.svg")} alt="" className="size-full" />,
   },
   {
     id: "codex_local",
     label: "Codex",
-    icon: <img src="/brands/codex-color.svg" alt="" className="size-full" />,
+    icon: <img src={withDeploymentBase("/brands/codex-color.svg")} alt="" className="size-full" />,
   },
 ];
 

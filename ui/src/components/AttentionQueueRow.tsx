@@ -20,6 +20,7 @@ import { useToastActions } from "../context/ToastContext";
 import { queryKeys } from "../lib/queryKeys";
 import { describeAttentionResolverAudience, type InteractionAudienceDescription } from "../lib/interaction-audience";
 import { interactionResolutionErrorMessage } from "../lib/interaction-resolution-error";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import {
   attentionDetailImages,
   attentionDetailLine,
@@ -621,7 +622,7 @@ function ExpandedImages({ images, issueHref }: { images: AttentionDetailImage[];
         const key = `${img.assetId}-${index}`;
         const image = (
           <img
-            src={src}
+            src={withDeploymentBase(src)}
             alt={img.alt ?? ""}
             loading="lazy"
             className="h-32 w-44 rounded-md border border-border bg-muted object-cover shadow-sm"

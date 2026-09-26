@@ -11,6 +11,7 @@ import type {
   ToolProfileWithDetails,
 } from "@paperclipai/shared";
 import { useNavigate, useSearchParams } from "@/lib/router";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import { toolsApi } from "@/api/tools";
 import { queryKeys } from "@/lib/queryKeys";
 import { cn, formatShortDate } from "@/lib/utils";
@@ -469,7 +470,7 @@ function AllowList({ rows, total }: { rows: AllowRow[]; total: number }) {
                 <div className="flex flex-col">
                   <span className="font-medium text-foreground">{row.tool}</span>
                   {row.degraded ? (
-                    <a className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline" href={`/apps/${row.connectionId}`}>
+                    <a className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline" href={withDeploymentBase(`/apps/${row.connectionId}`)}>
                       <PlugZap className="h-3 w-3" />
                       Reconnect
                     </a>

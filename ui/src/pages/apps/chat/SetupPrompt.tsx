@@ -3,6 +3,7 @@ import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { copyTextToClipboard } from "@/lib/clipboard";
+import { withDeploymentBase } from "@/lib/deployment-base";
 
 export function buildSetupPrompt(instanceUrl: string, instructions: string) {
   let instanceOrigin: string | null = null;
@@ -36,8 +37,8 @@ export function SetupPrompt({ prompt }: { prompt: string }) {
         }}
       >
         <span className="flex -space-x-1" aria-hidden="true">
-          <img src="/brands/claude-color.svg" alt="" className="size-4 rounded-full bg-background ring-2 ring-background" />
-          <img src="/brands/codex-color.svg" alt="" className="size-4 rounded-full bg-background ring-2 ring-background" />
+          <img src={withDeploymentBase("/brands/claude-color.svg")} alt="" className="size-4 rounded-full bg-background ring-2 ring-background" />
+          <img src={withDeploymentBase("/brands/codex-color.svg")} alt="" className="size-4 rounded-full bg-background ring-2 ring-background" />
         </span>
         {status === "copied" ? "Copied setup prompt" : "Copy setup prompt"}
         {status === "copied" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}

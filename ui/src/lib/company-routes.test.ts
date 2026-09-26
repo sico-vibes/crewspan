@@ -42,6 +42,16 @@ describe("company routes", () => {
     expect(toCompanyRelativePath("/PAP/search?q=foo")).toBe("/search?q=foo");
   });
 
+  it("re-prefixes bare company settings routes using the organization prefix", () => {
+    expect(applyCompanyPrefix("/company/settings", "CRE")).toBe("/CRE/company/settings");
+    expect(applyCompanyPrefix("/company/settings?tab=access#members", "CRE")).toBe(
+      "/CRE/company/settings?tab=access#members",
+    );
+    expect(applyCompanyPrefix("/company/settings/instance/access", "CRE")).toBe(
+      "/CRE/company/settings/instance/access",
+    );
+  });
+
   it("rewrites company package paths with the active prefix", () => {
     expect(applyCompanyPrefix("/company/export", "NEU")).toBe("/NEU/company/export");
     expect(applyCompanyPrefix("/company/import", "NEU")).toBe("/NEU/company/import");

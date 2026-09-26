@@ -12,6 +12,7 @@ import { resolveAgentAppearance } from "@paperclipai/shared";
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "@/lib/router";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import type { WorkTimelineActor, WorkTimelineResult } from "@paperclipai/shared";
 import { applyCompanyPrefix, extractCompanyPrefixFromPath } from "@/lib/company-routes";
 import {
@@ -385,7 +386,7 @@ export function WorkTimelineChart({
 
   const openIssue = (issueId: string) => {
     const href = applyCompanyPrefix(`/issues/${encodeURIComponent(issueId)}`, companyPrefix);
-    window.open(href, "_blank", "noopener,noreferrer");
+    window.open(withDeploymentBase(href), "_blank", "noopener,noreferrer");
   };
 
   const updateVisibleRange = (fromMs: number, toMs: number) => {

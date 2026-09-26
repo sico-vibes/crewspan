@@ -29,6 +29,7 @@ import {
   type ReactNode,
   type ComponentType,
 } from "react";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import * as ReactModule from "react";
 import { useQuery } from "@tanstack/react-query";
 import type {
@@ -428,7 +429,7 @@ async function importPluginModule(url: string): Promise<Record<string, unknown>>
   }
 
   // Fetch the module source text
-  const response = await fetch(url);
+  const response = await fetch(withDeploymentBase(url));
   if (!response.ok) {
     throw new Error(`Failed to fetch plugin module: ${response.status} ${response.statusText}`);
   }

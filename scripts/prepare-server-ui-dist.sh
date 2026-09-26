@@ -31,4 +31,8 @@ fi
 
 rm -rf "$SERVER_UI_DIST"
 cp -r "$UI_DIST" "$SERVER_UI_DIST"
+# Static assets are public responses, and the server may run under a separate
+# unprivileged account. Keep the generated tree traversable/readable regardless
+# of the builder's umask or source directory owner.
+chmod -R a+rX "$SERVER_UI_DIST"
 echo "  -> Copied ui/dist to server/ui-dist"

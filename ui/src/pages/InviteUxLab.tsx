@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CompanyPatternIcon } from "@/components/CompanyPatternIcon";
 import { cn } from "@/lib/utils";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import {
   ArrowRight,
   Check,
@@ -425,7 +426,7 @@ function InviteResultPreview({
           <>
             <div className="border border-zinc-800 p-3">
               <p className="mb-1 text-xs text-zinc-500">Approval page</p>
-              <a className="text-sm text-zinc-200 underline underline-offset-2" href="/company/settings/members">
+              <a className="text-sm text-zinc-200 underline underline-offset-2" href={withDeploymentBase("/company/settings/members")}>
                 Settings → Members
               </a>
             </div>
@@ -620,7 +621,7 @@ function CompanyInvitesPreview() {
                 Review invite status, role, inviter, and any linked join request.
               </CardDescription>
             </div>
-            <a href="/inbox/requests" className="text-sm underline underline-offset-4">
+            <a href={withDeploymentBase("/inbox/requests")} className="text-sm underline underline-offset-4">
               Open join request queue
             </a>
           </div>
@@ -654,7 +655,7 @@ function CompanyInvitesPreview() {
                     <td className="px-5 py-3 align-top text-muted-foreground">{invite.createdAt}</td>
                     <td className="px-5 py-3 align-top">
                       {invite.relatedLabel === "Review request" ? (
-                        <a href="/inbox/requests" className="underline underline-offset-4">
+                        <a href={withDeploymentBase("/inbox/requests")} className="underline underline-offset-4">
                           {invite.relatedLabel}
                         </a>
                       ) : (

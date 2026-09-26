@@ -8,6 +8,7 @@ import type {
   ProviderTraceMetadata,
 } from "@paperclipai/shared";
 import { tenantSessionRecovery } from "@/lib/tenant-session-recovery";
+import { deploymentApiUrl } from "@/lib/deployment-base";
 import { api, type RequestOptions } from "./client";
 
 export interface RunLivenessFields {
@@ -170,7 +171,7 @@ export const heartbeatsApi = {
     api.delete<{ ok: true }>(`/heartbeat-runs/${runId}/provider-trace`),
   downloadProviderTrace: async (runId: string): Promise<Blob> => {
     const response = await fetch(
-      `/api/heartbeat-runs/${runId}/provider-trace/download`,
+      deploymentApiUrl(`/api/heartbeat-runs/${runId}/provider-trace/download`),
       {
         credentials: "include",
         headers: { Accept: "application/x-ndjson" },

@@ -2,6 +2,7 @@ import * as React from "react"
 import { Avatar as AvatarPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { withDeploymentBase } from "@/lib/deployment-base"
 
 function Avatar({
   className,
@@ -29,12 +30,14 @@ function Avatar({
 
 function AvatarImage({
   className,
+  src,
   ...props
 }: React.ComponentProps<typeof AvatarPrimitive.Image>) {
   return (
     <AvatarPrimitive.Image
       data-slot="avatar-image"
       className={cn("aspect-square size-full object-cover", className)}
+      src={typeof src === "string" ? withDeploymentBase(src) : src}
       {...props}
     />
   )

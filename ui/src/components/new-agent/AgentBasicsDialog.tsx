@@ -11,6 +11,7 @@ import { isNewAgentAdapterAllowed } from "@/lib/new-agent-adapters";
 import { queryKeys } from "@/lib/queryKeys";
 import { getAdapterDisplay } from "@/adapters/adapter-display-registry";
 import { cn } from "@/lib/utils";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import {
@@ -63,7 +64,7 @@ export function AdapterMark({
   return (
     <>
       <img
-        src={mark.src}
+        src={withDeploymentBase(mark.src)}
         className={cn(
           "shrink-0 object-contain",
           mark.dark && "dark:hidden",
@@ -73,7 +74,7 @@ export function AdapterMark({
       />
       {mark.dark && (
         <img
-          src={mark.dark}
+          src={withDeploymentBase(mark.dark)}
           className={cn("hidden shrink-0 object-contain dark:block", className)}
           alt=""
         />

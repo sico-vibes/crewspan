@@ -18,6 +18,7 @@ import {
 } from "@/lib/issue-attachments";
 import { queryKeys } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import { Card } from "@/components/ui/card";
 
 interface IssueAttachmentsSectionProps {
@@ -35,7 +36,7 @@ interface IssueAttachmentsSectionProps {
 }
 
 async function fetchAttachmentText(attachment: IssueAttachment) {
-  const response = await fetch(attachment.contentPath, {
+  const response = await fetch(withDeploymentBase(attachment.contentPath), {
     headers: { Accept: "text/markdown,text/plain;q=0.9,*/*;q=0.1" },
   });
   if (!response.ok) {
@@ -70,12 +71,12 @@ function AttachmentActions({
         </Button>
       ) : null}
       <Button asChild variant="ghost" size="icon-sm" title="Open in new tab">
-        <a href={attachmentOpenPath(attachment)} target="_blank" rel="noreferrer" aria-label={`Open ${filename}`}>
+        <a href={withDeploymentBase(attachmentOpenPath(attachment))} target="_blank" rel="noreferrer" aria-label={`Open ${filename}`}>
           <ExternalLink className="h-4 w-4" />
         </a>
       </Button>
       <Button asChild variant="ghost" size="icon-sm" title="Download">
-        <a href={attachmentDownloadPath(attachment)} aria-label={`Download ${filename}`}>
+        <a href={withDeploymentBase(attachmentDownloadPath(attachment))} aria-label={`Download ${filename}`}>
           <Download className="h-4 w-4" />
         </a>
       </Button>
@@ -161,7 +162,7 @@ function VideoAttachmentCard({
   const filename = attachmentFilename(attachment);
   return (
     <Card id={`attachment-${attachment.id}`} className="block scroll-mt-20 overflow-hidden py-0">
-      <OutputVideoPlayer src={attachment.contentPath} title={filename} />
+      <OutputVideoPlayer src={withDeploymentBase(attachment.contentPath)} title={filename} />
       <div className="flex flex-col gap-2 p-3 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           <p className="break-words text-sm font-semibold text-foreground">{filename}</p>
@@ -193,7 +194,7 @@ function GenericAttachmentRow({
       <OutputFileTile contentType={attachment.contentType} />
       <div className="min-w-0 flex-1">
         <a
-          href={attachmentOpenPath(attachment)}
+          href={withDeploymentBase(attachmentOpenPath(attachment))}
           target="_blank"
           rel="noreferrer"
           className="block truncate text-sm font-medium text-foreground hover:underline"
@@ -286,7 +287,7 @@ export function IssueAttachmentsSection({
               onClick={() => onImageClick(attachment)}
             >
               <img
-                src={attachment.contentPath}
+                src={withDeploymentBase(attachment.contentPath)}
                 alt={attachment.originalFilename ?? "attachment"}
                 className="h-full w-full object-cover"
                 loading="lazy"

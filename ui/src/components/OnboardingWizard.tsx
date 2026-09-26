@@ -5,6 +5,7 @@ import { aiConnectionsApi } from "@/api/ai-connections";
 import { aiProviderForAdapter } from "./ai-connections/AiConnectionField";
 import type { AiConnectionBinding } from "@paperclipai/shared";
 import { storeProviderApiKey } from "../lib/provider-credential";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import { SavedProviderKeySelect, useSavedProviderKeys } from "./onboarding/SavedProviderKeySelect";
 import { randomAgentAppearance, resolveAgentAppearance, agentAppearanceSchema } from "@paperclipai/shared";
 import { OnboardingCharacter } from "./onboarding/OnboardingCharacter";
@@ -268,7 +269,7 @@ function ModelSourceMark({
   if (Inline) return <Inline className="size-full" />;
   const brand = MODEL_SOURCE_BRAND_MARKS[type];
   if (!brand) return <Fallback className="size-full" />;
-  return <img src={brand} alt="" className="size-full" />;
+  return <img src={withDeploymentBase(brand)} alt="" className="size-full" />;
 }
 
 // Exported so tests write/read the exact key the component uses, instead of

@@ -1,6 +1,7 @@
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import { groupWarningsByStage, LOW_TRUST_REVIEW_PRESET } from "@paperclipai/shared";
 import type {
   Agent,
@@ -3989,7 +3990,7 @@ function ItemOutputAttachmentRow({ item }: { item: PipelineCaseAttachmentOutputI
           className="mt-0.5 block h-(--sz-30px) w-10 shrink-0 overflow-hidden rounded-sm border border-border bg-accent/10"
           aria-label={`Open ${filename}`}
         >
-          <img src={item.contentPath} alt={filename} className="h-full w-full object-cover" loading="lazy" />
+          <img src={withDeploymentBase(item.contentPath)} alt={filename} className="h-full w-full object-cover" loading="lazy" />
         </a>
       ) : (
         <Paperclip className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />

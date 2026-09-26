@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { loadLocalAppBrandAssets, type LocalAppBrandAssets } from "@/lib/app-brand-assets";
 import { cn } from "@/lib/utils";
+import { withDeploymentBase } from "@/lib/deployment-base";
 
 const TILE_COLORS = [
   "bg-(--app-logo-tile-1)",
@@ -66,11 +67,13 @@ export function AppLogo({
       ? localAssets.dark ?? localAssets.light
       : (allowRemoteFallback ? darkLogoUrl : null)
     : null;
-  const lightLogoUrlForRender = resolvedLogoUrl && !failedLogoUrls.has(resolvedLogoUrl)
-    ? resolvedLogoUrl
+  const localizedLogoUrl = resolvedLogoUrl ? withDeploymentBase(resolvedLogoUrl) : null;
+  const localizedDarkLogoUrl = resolvedDarkLogoUrl ? withDeploymentBase(resolvedDarkLogoUrl) : null;
+  const lightLogoUrlForRender = localizedLogoUrl && !failedLogoUrls.has(localizedLogoUrl)
+    ? localizedLogoUrl
     : null;
-  const darkLogoUrlForRender = resolvedDarkLogoUrl && !failedLogoUrls.has(resolvedDarkLogoUrl)
-    ? resolvedDarkLogoUrl
+  const darkLogoUrlForRender = localizedDarkLogoUrl && !failedLogoUrls.has(localizedDarkLogoUrl)
+    ? localizedDarkLogoUrl
     : null;
   const hasDistinctThemeLogos = Boolean(
     resolvedLogoUrl && resolvedDarkLogoUrl && resolvedLogoUrl !== resolvedDarkLogoUrl,

@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -776,7 +777,7 @@ export function FileViewerSheet({
                     className="h-7 w-7"
                   >
                     <a
-                      href={downloadUrl}
+                      href={withDeploymentBase(downloadUrl)}
                       download={resolvedResource?.title ?? basename(state.path)}
                       aria-label="Download file"
                       title="Download file"

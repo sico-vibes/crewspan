@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SetupWizardFooter } from "@/components/SetupWizard";
+import { withDeploymentBase } from "@/lib/deployment-base";
 
 export interface SlackAvatarProps {
   agentName: string;
@@ -31,7 +32,7 @@ export function SlackAvatarContent({
     setDownloading(true);
     setDownloadError(false);
     try {
-      const response = await fetch(avatarUrl);
+      const response = await fetch(withDeploymentBase(avatarUrl));
       if (
         !response.ok ||
         !response.headers.get("content-type")?.startsWith("image/png")
@@ -59,7 +60,7 @@ export function SlackAvatarContent({
         className="flex flex-col items-start gap-6 sm:flex-row sm:items-center"
       >
         <img
-          src={avatarUrl}
+          src={withDeploymentBase(avatarUrl)}
           width={512}
           height={512}
           alt={`${agentName}’s Cliptoon avatar`}

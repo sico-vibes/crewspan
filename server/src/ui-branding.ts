@@ -177,8 +177,16 @@ export function getWorktreeUiBranding(env: NodeJS.ProcessEnv = process.env): Wor
   };
 }
 
-export function renderFaviconLinks(branding: WorktreeUiBranding): string {
-  if (!branding.enabled || !branding.faviconHref) return DEFAULT_FAVICON_LINKS;
+export function renderFaviconLinks(branding: WorktreeUiBranding, basePath = ""): string {
+  if (!branding.enabled || !branding.faviconHref) {
+    if (!basePath) return DEFAULT_FAVICON_LINKS;
+    return [
+      `<link rel="icon" href="${basePath}/favicon.ico" sizes="48x48" />`,
+      `<link rel="icon" href="${basePath}/favicon.svg" type="image/svg+xml" />`,
+      `<link rel="icon" type="image/png" sizes="32x32" href="${basePath}/favicon-32x32.png" />`,
+      `<link rel="icon" type="image/png" sizes="16x16" href="${basePath}/favicon-16x16.png" />`,
+    ].join("\n");
+  }
 
   const href = escapeHtmlAttribute(branding.faviconHref);
   return [
@@ -220,7 +228,12 @@ function replaceMarkedBlock(html: string, startMarker: string, endMarker: string
 
 export function applyUiBranding(html: string, env: NodeJS.ProcessEnv = process.env): string {
   const branding = getWorktreeUiBranding(env);
-  const withFavicon = replaceMarkedBlock(html, FAVICON_BLOCK_START, FAVICON_BLOCK_END, renderFaviconLinks(branding));
+  // The static server sits behind proxies that may strip a deployment prefix.
+  // Infer the built Vite base from the entry asset so runtime branding keeps
+  // favicon requests inside the same deployment scope without extra server env.
+  const assetPath = html.match(/(?:src|href)="(\/[^"?#]*\/assets\/[^"?#]+)"/)?.[1];
+  const basePath = assetPath?.match(/^(.*)\/assets\//)?.[1] ?? "";
+  const withFavicon = replaceMarkedBlock(html, FAVICON_BLOCK_START, FAVICON_BLOCK_END, renderFaviconLinks(branding, basePath));
   return replaceMarkedBlock(
     withFavicon,
     RUNTIME_BRANDING_BLOCK_START,

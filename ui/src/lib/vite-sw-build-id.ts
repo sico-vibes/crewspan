@@ -56,12 +56,17 @@ export function serviceWorkerBuildIdPlugin(
   const serviceWorkerFileName = options.serviceWorkerFileName ?? "sw.js";
   let buildId: string | null = null;
   let outDir = "dist";
+  let publicDir = "public";
 
   return {
     name: "paperclip-sw-build-id",
     apply: "build",
     configResolved(config) {
       outDir = config.build.outDir;
+      if (typeof config.publicDir !== "string") {
+        throw new Error("service worker build stamping requires a configured public directory");
+      }
+      publicDir = config.publicDir;
     },
     generateBundle(_options, bundle) {
       const entry = Object.values(bundle).find(
@@ -73,7 +78,11 @@ export function serviceWorkerBuildIdPlugin(
     },
     closeBundle() {
       const swPath = path.resolve(outDir, serviceWorkerFileName);
-      const source = fs.readFileSync(swPath, "utf8");
+      // Always stamp the stable source. Reading the already-stamped dist file
+      // makes a second build in the same checkout fail because its placeholder
+      // has been replaced by the previous build id.
+      const sourcePath = path.resolve(publicDir, serviceWorkerFileName);
+      const source = fs.readFileSync(sourcePath, "utf8");
       const stamped = stampServiceWorkerBuildId(source, buildId ?? "build");
       fs.writeFileSync(swPath, stamped);
     },

@@ -1,4 +1,5 @@
 import { skillAccentColor } from "@/lib/skill-create";
+import { withDeploymentBase } from "@/lib/deployment-base";
 
 /**
  * Minimal shape needed to render a skill's square icon. `DiscoveryCard`
@@ -17,7 +18,7 @@ export function SkillCardIcon({ card, size = 36 }: { card: SkillIconCard; size?:
   if (card.iconUrl) {
     return (
       <img
-        src={card.iconUrl}
+        src={withDeploymentBase(card.iconUrl)}
         alt=""
         className="shrink-0 rounded-md object-cover"
         style={{ width: size, height: size }}

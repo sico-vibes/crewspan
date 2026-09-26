@@ -3,6 +3,7 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 import { ChevronLeft, ChevronRight, Download, X } from "lucide-react";
 import { attachmentDownloadPath, attachmentFilename } from "@/lib/issue-attachments";
 import { isVideoLikeOutput } from "@/lib/issue-output";
+import { withDeploymentBase } from "@/lib/deployment-base";
 
 export interface GalleryMediaItem {
   id: string;
@@ -142,7 +143,7 @@ export function ImageGalleryModal({
               {isVideo ? (
                 <video
                   ref={setMediaRef}
-                  src={current.contentPath}
+                  src={withDeploymentBase(current.contentPath)}
                   className="max-w-full max-h-full rounded-lg"
                   controls
                   playsInline
@@ -150,7 +151,7 @@ export function ImageGalleryModal({
               ) : (
                 <img
                   ref={setMediaRef}
-                  src={current.contentPath}
+                  src={withDeploymentBase(current.contentPath)}
                   alt={filename}
                   className="max-w-full max-h-full object-contain select-none rounded-lg"
                   draggable={false}

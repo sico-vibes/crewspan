@@ -25,6 +25,7 @@ import type {
 } from "@paperclipai/shared";
 import { pluginsApi, type PluginUiContribution } from "@/api/plugins";
 import { authApi } from "@/api/auth";
+import { withDeploymentBase } from "@/lib/deployment-base";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "@/lib/router";
 import { queryKeys } from "@/lib/queryKeys";
@@ -447,7 +448,7 @@ function LauncherRenderContent({
     if (renderEnvironment.environment === "iframe") {
       return (
         <iframe
-          src={`/_plugins/${encodeURIComponent(instance.launcher.pluginId)}/ui/${instance.launcher.action.target}`}
+          src={withDeploymentBase(`/_plugins/${encodeURIComponent(instance.launcher.pluginId)}/ui/${instance.launcher.action.target}`)}
           title={`${instance.launcher.pluginDisplayName} ${instance.launcher.displayName}`}
           className="h-full min-h-[24rem] w-full rounded-md border border-border bg-background"
         />
