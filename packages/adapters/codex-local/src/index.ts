@@ -139,7 +139,7 @@ Core fields:
 - promptTemplate (string, optional): run prompt template
 - search (boolean, optional): run codex with --search
 - fastMode (boolean, optional): enable Codex Fast mode; supported on GPT-6 (astra/sol/luna), GPT-5.6 (sol/terra/luna), GPT-5.5, GPT-5.4 and passed through for manual model IDs
-- dangerouslyBypassApprovalsAndSandbox (boolean, optional): run with bypass flag
+- dangerouslyBypassApprovalsAndSandbox (boolean, optional): bypass approvals and sandbox; ACP maps this to the bundled Codex ACP server's agent-full-access mode unless network denial is active
 - command (string, optional): defaults to "codex"
 - extraArgs (string[], optional): additional CLI args
 - env (object, optional): KEY=VALUE environment variables

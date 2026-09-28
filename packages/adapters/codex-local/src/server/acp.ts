@@ -34,12 +34,16 @@ import type {
 } from "@paperclipai/adapter-utils/acpx-engine/execute";
 import {
   asNumber,
+  asBoolean,
   asString,
   asStringArray,
   parseObject,
 } from "@paperclipai/adapter-utils/server-utils";
 import { createWorkspaceRestoreTeardown } from "@paperclipai/adapter-utils/workspace-restore-teardown";
-import { normalizeCodexModel } from "../index.js";
+import {
+  DEFAULT_CODEX_LOCAL_BYPASS_APPROVALS_AND_SANDBOX,
+  normalizeCodexModel,
+} from "../index.js";
 import { classifyCodexAuthRefreshFailure, extractCodexRetryNotBefore } from "./parse.js";
 import { copyBackCodexAuth } from "./codex-auth-copyback.js";
 import { buildCodexAuthInboundProvision } from "./codex-auth-merge-scripts.js";
@@ -147,6 +151,23 @@ export function buildCodexAcpConfig(config: Record<string, unknown>): Record<str
     const match = /^(?:(?:--config=|-c=?)\s*)?sandbox_workspace_write\.network_access\s*=\s*(true|false)\s*$/.exec(arg);
     if (match) networkAccess = match[1] === "true";
   }
+
+  // codex-acp reads INITIAL_AGENT_MODE when it starts. Forward Paperclip's
+  // existing bypass setting so ACP honors the same sandbox/approval choice as
+  // the Codex CLI lane. A runner-level or explicit ACP network denial must keep
+  // the session in the bounded agent mode even when bypass is enabled.
+  const bypassApprovalsAndSandbox = asBoolean(
+    config.dangerouslyBypassApprovalsAndSandbox,
+    asBoolean(
+      config.dangerouslyBypassSandbox,
+      DEFAULT_CODEX_LOCAL_BYPASS_APPROVALS_AND_SANDBOX,
+    ),
+  );
+  const runnerNetworkDenied = env.PAPERCLIP_RUNNER_NETWORK_ACCESS === "disabled";
+  env.INITIAL_AGENT_MODE =
+    bypassApprovalsAndSandbox && networkAccess && !runnerNetworkDenied
+      ? "agent-full-access"
+      : "agent";
 
   return {
     ...config,

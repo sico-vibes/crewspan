@@ -467,7 +467,30 @@ describe("codex_local ACP lane", () => {
 
   it("enables workspace networking for ACP without changing other env settings", () => {
     expect(buildCodexAcpConfig({ env: { CUSTOM: "kept" } })).toMatchObject({
-      env: { CUSTOM: "kept", PAPERCLIP_CODEX_ACP_NETWORK_ACCESS: "true" },
+      env: {
+        CUSTOM: "kept",
+        PAPERCLIP_CODEX_ACP_NETWORK_ACCESS: "true",
+        INITIAL_AGENT_MODE: "agent-full-access",
+      },
+    });
+  });
+
+  it.each([
+    { dangerouslyBypassApprovalsAndSandbox: true, expectedMode: "agent-full-access" },
+    { dangerouslyBypassApprovalsAndSandbox: false, expectedMode: "agent" },
+    {
+      dangerouslyBypassApprovalsAndSandbox: true,
+      env: { PAPERCLIP_CODEX_ACP_NETWORK_ACCESS: "false" },
+      expectedMode: "agent",
+    },
+    {
+      dangerouslyBypassApprovalsAndSandbox: true,
+      env: { PAPERCLIP_RUNNER_NETWORK_ACCESS: "disabled" },
+      expectedMode: "agent",
+    },
+  ])("maps the ACP bypass setting to the supported startup mode: %j", ({ expectedMode, ...config }) => {
+    expect(buildCodexAcpConfig(config)).toMatchObject({
+      env: { INITIAL_AGENT_MODE: expectedMode },
     });
   });
 
