@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const uiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const fontDir = path.join(uiRoot, "public", "fonts");
+const fontDir = path.join(uiRoot, "src", "assets", "fonts");
 const cssPath = path.join(uiRoot, "src", "index.css");
 
 const fontFiles = ["InterVariable.woff2", "InterVariable-Italic.woff2"];
@@ -15,10 +15,10 @@ describe("bundled UI font assets", () => {
 
     for (const fileName of fontFiles) {
       const fontPath = path.join(fontDir, fileName);
-      expect(existsSync(fontPath), `${fileName} should exist in ui/public/fonts`).toBe(true);
+      expect(existsSync(fontPath), `${fileName} should exist in ui/src/assets/fonts`).toBe(true);
       expect(statSync(fontPath).isFile(), `${fileName} should be a file`).toBe(true);
       expect(readFileSync(fontPath).subarray(0, 4).toString("ascii")).toBe("wOF2");
-      expect(css).toContain(`url("/fonts/${fileName}")`);
+      expect(css).toContain(`url("./assets/fonts/${fileName}")`);
     }
 
     expect(css).toContain('--font-sans: "InterVariable"');

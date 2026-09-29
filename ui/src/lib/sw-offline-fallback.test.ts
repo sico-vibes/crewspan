@@ -21,7 +21,7 @@ function loadServiceWorkerFetchListener(overrides: {
     },
     skipWaiting: vi.fn(),
     clients: { claim: vi.fn() },
-    location: { origin: "https://app.example.com" },
+    location: { origin: "https://app.example.com", pathname: "/sw.js" },
   };
   const caches = {
     match: overrides.cachesMatch,
