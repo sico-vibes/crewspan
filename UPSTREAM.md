@@ -178,3 +178,30 @@ should name an exact SHA (`41675dcec…`) and require the VPS to be moved to it.
   the v3 M0 gate before moving the pin.
 - Do not assume `origin/main` is a clean mirror of upstream; verify both remotes
   (see §3–§4).
+
+## 9. M0 dispositions (Board, 2026-09-29)
+
+The Board recorded these dispositions. They resolve the open questions in §6 and
+parts of §7; nothing here changes the upstream provenance pin.
+
+1. **Reference instance = fork `main` at SHA `49cac8af8`** (Board decision D1).
+   The M0 reference deployment is the Crewspan build, not a vanilla upstream
+   build, so §3.1's "deploy the unchanged pinned build" clause is scoped to the
+   upstream **build/test evidence** (captured at the `v2026.916.1` pin) rather
+   than to the deployment. `v2026.916.1` (`d554c4789`) remains the upstream
+   provenance baseline per §6. Later commits to `main` are M0 evidence output,
+   not the reference build.
+2. **Auth mode = `authenticated`** for the reference instance (§3.1). The
+   previous `local_trusted` default is superseded.
+3. **Service mode = production start** (`server start` on the built workspace),
+   not the dev server. Until the workspace builds on the reference host, dev
+   remains an explicitly recorded temporary deviation.
+4. **Off-host backup**: an encrypted copy to an off-host destination, 7 daily
+   plus 4 weekly retained, Board-owned, with a documented restore rehearsal.
+5. **M0 closes before M1**: no M1–M7 implementation begins until the §3.5
+   go/no-go is recorded (§14).
+
+Unchanged by these dispositions: the Linux capture of §3.1 build/install/test
+evidence (§7.4), the VPS `upstream` remote and `doc/FORK-BOUNDARY.md` topology
+corrections (§7.1–7.2), telemetry/announcement decisions (§7.3), and upstream
+engagement (§7.5).
