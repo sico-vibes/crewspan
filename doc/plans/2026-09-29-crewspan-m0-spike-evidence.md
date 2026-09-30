@@ -101,3 +101,59 @@ The throwaway probes close several feasibility questions but **do not complete
 the §3.3 pass conditions**. S1, S2, S3, S4, S5, S6, and S7 all remain fails or
 partials as detailed above. Keep the M0 decision open; this report does not
 record a Board go/no-go and does not authorize M1–M7 implementation.
+
+## 2026-09-30 authorized VPS container S3 spike
+
+This addendum supersedes the earlier statements that the VPS was out of scope
+and that S3 could not be attempted there. The Board authorized the VPS only as
+a disposable M0 containment host; the local reference instance remained
+untouched. No VPS service, `/srv/crewspan`, Dashboard data/service, or Nginx
+configuration was changed.
+
+**Question and method:** Can a real API-key-capable CLI adapter run inside a
+contained sandbox under a runner supervisor, with §9.14 probes failing closed?
+Cloned current `main` into root-only `/srv/crewspan-spike/source`, at
+`f6008408f55c58444544f398065f85de67083819`, built the repository Dockerfile,
+and ran its image in Compose project `crewspan-s3-spike`. The project used its
+own PostgreSQL and server volumes and bound the API only to
+`127.0.0.1:43100`.
+
+| Check | Result | Evidence and limit |
+| --- | --- | --- |
+| Repository image / isolated service | **Pass.** | Docker build completed; `GET http://127.0.0.1:43100/api/health` returned `status: ok`, `deploymentMode: authenticated`, and `deploymentExposure: private`. Container inspection reported only `127.0.0.1:43100` for the server port. This was a fresh spike database, not the local reference. |
+| Paperclip Bubblewrap scope | **Partial; S3 condition not met.** | Host Bubblewrap 0.11.1 ran with `--unshare-all` and read-only `/usr`, `/bin`, `/lib`, `/lib64` mounts; a check confirmed the existing `/srv/crewspan` path was not visible in that namespace. The repository image itself has no `bwrap` executable, so the Paperclip adapter's Bubblewrap scope could not be run inside the shipped image or under its runner. This only proves a basic host-level namespace/filesystem check. |
+| Rootless Podman, default runtime | **Fail / unavailable.** | `podman` was absent on the host and in the repository image. No host package or service was installed. |
+| Rootless Podman with gVisor | **Fail / unavailable.** | `podman` and `runsc` were absent on the host and in the image. No runtime was installed. |
+| API-key-capable CLI and runner | **Not demonstrated.** | The image contains Codex CLI (`codex-cli 0.159.2`) and the `paperclip-runnerd` binary. The API instance remained at `bootstrap_pending`; no provider/API key or registered runner was supplied. CLI version and runner usage checks did not launch an adapter run. |
+| §9.14 full probe suite | **Not run; no pass claim.** | This spike had no runnable integrated §9.14 suite or configured supervised adapter. Therefore filesystem, network/metadata, credential/JWT, Git, API-scope, session-recall, and resource-exhaustion probes were not represented as passing or failing. No fail-closed suite result is claimed. |
+
+**S3 outcome: Fail.** The app image and loopback-only service ran, and the host's
+Bubblewrap could enforce a small namespace check, but the required real
+API-key-capable adapter run under the runner supervisor and the complete
+fail-closed §9.14 suite were not achieved. The container did not contain the
+Bubblewrap executable; rootless Podman and gVisor were unavailable; no provider
+credential or runner registration was supplied. This does not prove an escape
+or a sandbox vulnerability. It leaves the plan's S3 pass condition unmet.
+
+**Board disposition of remaining spikes:** S1 production route/query
+integration and leak tests, S2 upstream sync rehearsal (dependent on S1), S4
+the 1 GB/30 s gate and production broker, S5 a real adapter/model-gateway run,
+S6 provider-session integration, and S7 company-setting storage are carried
+into the first build phase as M1 work. They are not recorded here as M0
+blockers or as completed. S3 remains an M0 evidence failure; this report does
+not declare the §3.5 gate Go.
+
+**Cleanup:** Compose project `crewspan-s3-spike`, including its containers,
+network, and volumes, was removed. The `crewspan-s3-spike:f6008408` image and
+root-only `/srv/crewspan-spike` directory (including the generated auth secret
+and cloned source) were removed. No spike artifacts were intentionally left
+on the VPS.
+
+**Reproduction evidence:** VPS host `vmi3200409`, Linux kernel 6.19.10; service
+state read as `inactive`. Image build and launch command:
+`sudo docker compose -p crewspan-s3-spike --env-file /srv/crewspan-spike/.env
+-f /srv/crewspan-spike/compose.yml up -d --build`. Health and port binding
+were checked before teardown. The Bubblewrap check used the host executable,
+not the local reference or the app container; it ran
+`bwrap --unshare-all --ro-bind /usr /usr --ro-bind /bin /bin --ro-bind /lib /lib --ro-bind /lib64 /lib64 --proc /proc --dev /dev --tmpfs /tmp --chdir /tmp -- /usr/bin/bash -c 'test ! -e /srv/crewspan'`
+and exited 0. No credentials or provider secrets were read or recorded.
