@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "skills": {
+    "agy-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "bc909c5f22c67ca4a8045ed559904df32bdb8b4f754be2a7a0e05be66159daa1"
+    },
+    "aider-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "667786e3e69b413abd125b061bd8e6c6c9d01eb91907d717a6d2dbc34ac3624e"
+    },
+    "claude-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "36a1dd0bd6001ac75de3be68fcb47a366aef331b2ce8586f681ef37eab597b0b"
+    },
+    "cline-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "d7c64f32ed35b0d5ff329dc8815885ea39b2e9d0c39f468f76b1b418b118cde1"
+    },
+    "codex-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "107167f2f40de51993251aca5f1f7b28f4d7c1fb3a5c1d37b6da33f9a1e02388"
+    },
+    "commandcode-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "67d9abb4ab47e6d793d89ce5e34976dcef8ea32676ac961cb9ab9658c79ec26a"
+    },
+    "copilot-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "3ca140d286369ddda4084e89263126c160975fe71751e6b1aa8c110d9a8191c4"
+    },
+    "cursor-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "343dea419c18091bb81e2d79dafccea97f0b042ed9e472f67f1757a054e52fac"
+    },
+    "delegate-setup": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "b6b9748d0258bab716a115e0dc8910bc38c5fa313faafa13585a1d09322cfa9f"
+    },
+    "grok-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "80256f2117045d05aa3bb95c9068954d29bf19d56543bfc2a10197a1700536f4"
+    },
+    "kimi-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "28547af6a1d63f8346b857c1f4b725e68961622f12d74039cd591a2885a93710"
+    },
+    "omp-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "04901acadc571a2046fa8d621c414bbad6e0fb8681f32328b9a67e6b90ab51d5"
+    },
+    "opencode-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "4b997e45aa22d2064faa36efd897dba28cb2287bcfe987e47046a21542af4d0d"
+    },
+    "pi-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "69f69fea738702885a64839f9ae1689cfe418a607df0315009662c014c07088d"
+    },
+    "qoder-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "103682917c310f786b9294a0504f47d4dd3235eb2260de542a739a38d300067b"
+    },
+    "vibe-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "ef492882d5ca774092593b89bf3a9c47eba9dea546737a932efc7b24d27f738d"
+    },
+    "warp-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "f0ae23467a5fb117b05ff642961842e68ce0f89f15126765000a34cd6ef281a0"
+    },
+    "zcode-delegate": {
+      "source": "../amelnagdy/delegate-skills",
+      "sourceType": "local",
+      "computedHash": "3de6bec8b95dbcf92bc6ab8461d4e55020a890afdff4e1bbad0a4a488df4b50e"
+    }
+  }
+}
