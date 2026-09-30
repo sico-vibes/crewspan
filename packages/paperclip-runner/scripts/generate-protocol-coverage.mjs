@@ -90,7 +90,7 @@ const document = {
 };
 const encoded = `${JSON.stringify(document, null, 2)}\n`;
 if (process.argv.includes("--check")) {
-  const current = await readFile(outputPath, "utf8").catch(() => "");
+  const current = (await readFile(outputPath, "utf8").catch(() => "")).replaceAll("\r\n", "\n");
   if (current !== encoded) throw new Error("protocol coverage artifact is stale; run pnpm generate:protocol-coverage");
 } else {
   await writeFile(outputPath, encoded);

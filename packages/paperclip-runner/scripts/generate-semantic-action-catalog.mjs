@@ -12,7 +12,7 @@ const outputPath = resolve(
 const generated = canonicalPaperclipSemanticActionCatalog();
 
 if (process.argv.includes("--check")) {
-  const current = await readFile(outputPath, "utf8").catch(() => "");
+  const current = (await readFile(outputPath, "utf8").catch(() => "")).replaceAll("\r\n", "\n");
   if (current !== generated) {
     process.stderr.write(
       "generated/semantic-action-catalog.json is stale; run generate:semantic-action-catalog\n",
