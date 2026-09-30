@@ -32,13 +32,16 @@ describe("server package build script", () => {
     };
     const buildScript = packageJson.scripts?.build ?? "";
 
+    // Copies go through a Node script so the build also works on Windows,
+    // which has no `cp -R` / `mkdir -p`.
+    expect(buildScript).toContain("node ../scripts/copy-build-assets.mjs");
     expect(buildScript).toContain(
-      "mkdir -p dist/onboarding-assets dist/built-ins",
+      "src/onboarding-assets dist/onboarding-assets",
     );
-    expect(buildScript).toContain(
-      "cp -R src/onboarding-assets/. dist/onboarding-assets/",
-    );
-    expect(buildScript).toContain("cp -R src/built-ins/. dist/built-ins/");
+    expect(buildScript).toContain("src/built-ins dist/built-ins");
+    expect(buildScript).toContain("src/services/scripts dist/services/scripts");
+    expect(buildScript).not.toContain("cp -R");
+    expect(buildScript).not.toContain("mkdir -p");
   });
 
   it("vendors the private runner runtime without a production workspace dependency", () => {
@@ -58,7 +61,7 @@ describe("server package build script", () => {
       "pnpm --filter @paperclipai/paperclip-runner build",
     );
     expect(packageJson.scripts?.build).toContain(
-      "cp -R ../packages/paperclip-runner/dist/. dist/vendor/paperclip-runner/",
+      "../packages/paperclip-runner/dist dist/vendor/paperclip-runner",
     );
   });
 
