@@ -88,6 +88,12 @@ env:
   NPM_PUBLISH_VERIFY_ATTEMPTS: "180"
   NPM_PUBLISH_VERIFY_DELAY_SECONDS: "10"
 
+# Crewspan is a fork whose default branch is `main`, not upstream's `master`.
+# The release lanes below publish to the upstream `paperclipai` npm package and
+# use upstream's npm/AWS release environments, so they are scoped to the
+# upstream repository. In the fork they are skipped rather than failing on the
+# missing `master` branch or the absent upstream credentials. Build/test
+# verification (pr-trusted.yml, release-verify.yml) is unaffected.
 jobs:
   plan_preview:
     # Only the current master commit can use AWS. A preview or older source
@@ -489,7 +495,7 @@ jobs:
   # canary publish, so the nightly publish skips re-verification.
 
   select_nightly:
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.channel == 'nightly')
+    if: github.repository == 'paperclipai/paperclip' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.channel == 'nightly'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -718,7 +724,7 @@ jobs:
   # are the approval gate.
 
   select_beta:
-    if: github.event_name == 'workflow_dispatch' && inputs.channel == 'beta'
+    if: github.repository == 'paperclipai/paperclip' && github.event_name == 'workflow_dispatch' && inputs.channel == 'beta'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -1076,7 +1082,7 @@ jobs:
   # advances mid-run could be soak-checked at one commit and verified or
   # published at another.
   preflight_stable:
-    if: github.event_name == 'workflow_dispatch' && inputs.channel == 'stable'
+    if: github.repository == 'paperclipai/paperclip' && github.event_name == 'workflow_dispatch' && inputs.channel == 'stable'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

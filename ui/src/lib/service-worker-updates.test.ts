@@ -54,7 +54,7 @@ describe("startServiceWorkerUpdates", () => {
     const { container } = fakeContainer({ controlled: false });
     const { doc } = fakeDocument();
     startServiceWorkerUpdates({ container, documentRef: doc, reload: vi.fn() });
-    expect(container.register).toHaveBeenCalledWith("/sw.js");
+    expect(container.register).toHaveBeenCalledWith("/sw.js", { scope: "/" });
   });
 
   it("reloads once when a new worker takes over a hidden, already-controlled page", async () => {

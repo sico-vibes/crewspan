@@ -204,7 +204,7 @@ Decide whether this is a fresh instance or a migration before starting Crewspan 
 Leave `Start-M0.ps1` running so its embedded PostgreSQL server is available to the backup CLI. In another PowerShell window at `C:\Crewspan`, run:
 
 ```powershell
-npm exec --yes --package=pnpm@9.15.4 -- pnpm paperclipai db:backup --dir 'C:\Crewspan\.paperclip-home\instances\m0\data\backups' --json
+node cli/node_modules/tsx/dist/cli.mjs cli/src/index.ts db:backup --dir 'C:\Crewspan\.paperclip-home\instances\m0\data\backups' --json
 ```
 
 Confirm the command reports a completed backup and note the exact `.sql.gz` filename and size. Keep the archive private. A logical database backup includes database data, migration history, and plugin-owned schemas, but not the local storage directory, local encrypted-secrets master key, instance environment/config files, workspaces, or Codex login state.
@@ -422,7 +422,7 @@ The application's automatic logical DB backup defaults are enabled, every 60 min
 ```sh
 cd /srv/crewspan
 sudo -u crewspan env PAPERCLIP_HOME=/var/lib/crewspan/paperclip PAPERCLIP_INSTANCE_ID=m0 \
-  pnpm paperclipai db:backup --dir /var/lib/crewspan/paperclip/instances/m0/data/backups --json
+  node cli/node_modules/tsx/dist/cli.mjs cli/src/index.ts db:backup --dir /var/lib/crewspan/paperclip/instances/m0/data/backups --json
 ```
 
 Confirm a recent `.sql.gz` exists and has nonzero size. Keep a second encrypted copy at the Board-approved off-host destination; local retention alone is not disaster recovery. Database backups do not contain local uploads or the encrypted-secrets master key, so back those paths up separately when used. Protect and test restoration of the JWT signer through the secret store as well.
