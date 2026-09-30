@@ -135,6 +135,26 @@ successful build would have nothing to diff against yet. That manifest also
 pins its environment to `platform: "ubuntu-24.04"` — this Windows host is not
 the intended capture platform for that suite regardless of the plugin bug.
 
+### Update (2026-09-29, CREW-26): build fixed
+
+The gap above is closed. `scripts/storybook-agent-avatar-assets.mjs` (and the same pattern in
+`scripts/serve-storybook-static.mjs`, used by the Playwright suite's `webServer`) wrapped
+`serverRequire.resolve("tsx/esm/api")` in `pathToFileURL(...).href` before the dynamic
+`import()`. Verified on this Windows host:
+
+- `pnpm --filter @paperclipai/ui build-storybook` exits 0 and produces `ui/storybook-static/`
+  (confirmed `index.html` and `index.json` present; build completed in ~4m39s).
+- `npx playwright test --config tests/storybook-visual/playwright.config.ts --project=stories`
+  starts: the `webServer` (`scripts/serve-storybook-static.mjs`) boots, Chromium launches, 2645
+  tests are collected and run against the built stories.
+- Remaining state is unchanged from the platform-lock note above, not a new gap: no baseline
+  archive is configured yet (`baseline-manifest.json` still empty), and the suite's
+  `maxDiffPixels: 0` comparisons are pinned to `ubuntu-24.04` — a Windows run cannot produce a
+  pass/fail pixel verdict regardless. The one test run manually here failed only with "snapshot
+  doesn't exist yet, writing actual" (expected with no baseline downloaded), not the ESM error.
+- No behavior change on Linux/macOS: `pathToFileURL()` on a POSIX absolute path returns the
+  equivalent `file://` URL, so the import target is identical there.
+
 ## 5. `DESIGN.md` principles (source of truth, v0.3)
 
 Captured verbatim reference (see [`DESIGN.md`](../../DESIGN.md) at the repo root — unchanged
