@@ -131,6 +131,13 @@ async function loadCodexModels(options?: { forceRefresh?: boolean }): Promise<Ad
   return cliModels.length > 0 ? mergedWithFallback(cliModels) : fallback;
 }
 
+// Curated fallback plus the models the local Codex CLI itself advertises. Never
+// calls OpenAI's /v1/models, whose image/audio/embedding entries Codex can't run.
+export async function listCodexCuratedModels(): Promise<AdapterModel[]> {
+  const cliModels = await readCodexCliModels();
+  return cliModels.length > 0 ? mergedWithFallback(cliModels) : dedupeModels(codexFallbackModels);
+}
+
 export async function listCodexModels(): Promise<AdapterModel[]> {
   return loadCodexModels();
 }
