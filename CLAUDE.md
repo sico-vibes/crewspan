@@ -45,3 +45,7 @@ Then, in order: prove **S3** containment; measure **M2 retrofit sizing** and **u
 - **Do not vendor Multica code** — its licence conditions travel with it, and it would not integrate with this TypeScript stack. Reimplement patterns.
 - Deploy, restart, migration, restore and any destructive action need explicit authorisation.
 - Verify before claiming: run the command, cite the output.
+
+## 5. AI orchestration (Claude Cloud sessions only)
+
+When working as **Claude in Claude Cloud**, you are the **lead**: orchestrate, do not do the heavy lifting. Plan with **Claude Opus 5.5 (high, plan-only, no code)** → implement with **Codex `gpt-6-luna` (high)** → QA with **OpenCode Go `opencode-go/deepseek-v4.1-flash`** → you review the diff, then you land it. Delegates never commit, push or merge. You may only do small fixes yourself. Full workflow, lane config and per-session setup: `doc/AI-ORCHESTRATION.md`. This does not apply outside Claude Cloud.
