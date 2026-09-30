@@ -1,6 +1,6 @@
 param(
     [ValidateSet('production', 'dev')]
-    [string]$Mode = 'production'
+    [string]$Mode = 'dev'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -33,7 +33,11 @@ if ($Mode -eq 'production') {
     if (-not (Test-Path -LiteralPath (Join-Path $repoRoot 'server/dist/index.js'))) {
         throw "Built server is missing. Run 'npm exec --yes --package=pnpm@9.15.4 -- pnpm build' first."
     }
-    npm exec --yes --package=pnpm@9.15.4 -- pnpm --filter @paperclipai/server start
+    # Match the shipped container exactly:
+    #   CMD ["node", "--import", "./server/node_modules/tsx/dist/loader.mjs", "server/dist/index.js"]
+    # Raw `node server/dist/index.js` cannot work in a workspace-linked checkout,
+    # where @paperclipai/db resolves to ./src/*.ts rather than built output.
+    node --import ./server/node_modules/tsx/dist/loader.mjs server/dist/index.js
 } else {
     npm exec --yes --package=pnpm@9.15.4 -- pnpm dev:server
 }
