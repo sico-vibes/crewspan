@@ -38,7 +38,14 @@ Only two things:
 Everything else goes through the stages above. If the lead finds itself writing a large change,
 it stops and plans it instead.
 
-## 4. Rules that still apply
+## 4. Merging
+
+The owner's standing instruction: **merge to `main` right away once the change is confirmed good.**
+"Confirmed good" means CI is green on the exact head, including the `ci / verify` gate, and the lead has
+reviewed the diff. Merge with a **merge commit**, not a squash, so history from upstream stays linked.
+This covers ordinary changes. It does not cover the actions in section 5 that need separate authorisation.
+
+## 5. Rules that still apply
 
 The guardrails in `CLAUDE.md` bind every stage and every agent:
 
@@ -50,10 +57,10 @@ The guardrails in `CLAUDE.md` bind every stage and every agent:
 - **Containment (S3).** No agent runs against real data until the S3 containment gate is met.
   Until then, delegated agents work only on this repository's code and public data.
 
-## 5. Lane configuration
+## 6. Lane configuration
 
-The `delegate-setup` skill stores this as **lanes** (`delegate-fleet.v1`). This is the intended map.
-It has been validated with `config.mjs validate`. It is **not applied** until the owner approves a write.
+The `delegate-setup` skill stores this as **lanes** (`delegate-fleet.v1`). The map below is committed
+as the project config `.delegate/config.json` (repo scope only, never global).
 
 ```json
 {
@@ -69,10 +76,11 @@ It has been validated with `config.mjs validate`. It is **not applied** until th
 - `plan` is `readOnly` so the planner cannot edit files.
 - `qa` sets no `variant`, so OpenCode's own default applies.
 - Dispatch with `--lane <name>` through the matching `*-delegate` skill.
-- A project config (`.delegate/config.json`) only takes effect after it is written through
-  `delegate-setup`. A cloned or hand-edited file fails closed.
+- A project config only takes effect in a clone after it is written through `delegate-setup`. The
+  approval is stored in that clone's local git metadata, not in the committed file. A fresh session
+  therefore must approve it once more (step 5 in section 7). A hand-edited file fails closed.
 
-## 6. Session setup
+## 7. Session setup
 
 A Claude Cloud container is temporary. Logins and installs are gone when the session ends. Each session:
 
@@ -82,11 +90,14 @@ A Claude Cloud container is temporary. Logins and installs are gone when the ses
    session. Write it to `~/.local/share/opencode/auth.json` as `{"opencode-go": {"type": "api", "key": "..."}}`
    with mode `0600`. Do not commit it.
 4. Verify each with one real request. A status line alone is not proof.
+5. Re-approve the committed lanes for this clone:
+   `node .claude/skills/delegate-setup/scripts/config.mjs write --scope project --cwd "$PWD" .delegate/config.json`
+   then run `config.mjs load --cwd "$PWD"` and check that `projectTrusted` is `true`.
 
 To avoid repeating this, put the installs in the environment's setup script and the OpenCode Go key in
 its secrets.
 
-## 7. Known caveats
+## 8. Known caveats
 
 - **Discovery shows OpenCode as unauthenticated.** `delegate-setup`'s probe looks for `●` (U+25CF), but
   OpenCode 1.18.x prints `•` (U+2022). This is a false negative in the probe. Verify with a real request.
