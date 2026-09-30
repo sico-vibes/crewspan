@@ -1,3 +1,8 @@
+param(
+    [ValidateSet('production', 'dev')]
+    [string]$Mode = 'production'
+)
+
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = $PSScriptRoot
@@ -24,4 +29,11 @@ Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
 Remove-Item Env:DATABASE_MIGRATION_URL -ErrorAction SilentlyContinue
 
 Set-Location -LiteralPath $repoRoot
-npm exec --yes --package=pnpm@9.15.4 -- pnpm dev:server
+if ($Mode -eq 'production') {
+    if (-not (Test-Path -LiteralPath (Join-Path $repoRoot 'server/dist/index.js'))) {
+        throw "Built server is missing. Run 'npm exec --yes --package=pnpm@9.15.4 -- pnpm build' first."
+    }
+    npm exec --yes --package=pnpm@9.15.4 -- pnpm --filter @paperclipai/server start
+} else {
+    npm exec --yes --package=pnpm@9.15.4 -- pnpm dev:server
+}

@@ -10,15 +10,48 @@
 
 ## Start and stop
 
-Open PowerShell in `C:\Crewspan` and run:
+The M0 reference instance is `default`, using `%USERPROFILE%\.paperclip`.
+`Start-M0.ps1` is the earlier isolated `m0` setup and is not the reference
+instance. The Board's accepted target for the local reference is the built
+production server. The dev-server mode remains available as a rollback. From
+PowerShell in `C:\Crewspan`, build the workspace after pulling the approved
+branch, then start the default instance:
 
 ```powershell
-.\Start-M0.ps1
+npm exec --yes --package=pnpm@9.15.4 -- pnpm build
+.\Start-Default.ps1
 ```
+
+`Start-Default.ps1` now starts `server/dist/index.js` through the server's
+`start` script by default. It preserves the instance home, loopback bind,
+instance ID, port, and JWT secret setup already used by the dev launcher. If a
+rollback is needed, stop the process with Ctrl+C and run
+`.\Start-Default.ps1 -Mode dev`; this uses the previous `pnpm dev:server`
+path. Rebuild before returning to production mode after server source changes.
+
+The production start has not yet been applied to the running reference
+instance. Before switching, record its healthy baseline (process state,
+`/api/health`, loopback listener, UI, and recent logs); after switching, capture
+the same evidence and confirm logs are clean. Do not treat a successful build
+in another worktree as reference-instance evidence.
+
+Run these checks in a second PowerShell window both before and after the
+switch, recording the output and the launcher window's logs:
+
+```powershell
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:3100/api/health | Select-Object StatusCode
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:3100/ | Select-Object StatusCode
+Get-NetTCPConnection -LocalPort 3100 -State Listen | Select-Object LocalAddress, LocalPort, OwningProcess
+Get-Process -Id (Get-NetTCPConnection -LocalPort 3100 -State Listen | Select-Object -First 1 -ExpandProperty OwningProcess) | Select-Object Id, ProcessName
+```
+
+Both HTTP status codes should be 200; every listener address should be
+`127.0.0.1`; the process should be the Node server. Review the startup window
+for errors after the UI and health checks succeed.
 
 Open [http://127.0.0.1:3100](http://127.0.0.1:3100). The API health endpoint is [http://127.0.0.1:3100/api/health](http://127.0.0.1:3100/api/health). Press Ctrl+C in that PowerShell window to stop the server.
 
-The start script pins pnpm 9.15.4 and sets the app home, instance ID, loopback bind, and port in the same process. Paperclip uses its embedded PostgreSQL database under `C:\Crewspan\.paperclip-home\instances\m0\db`; it does not connect to the separate PostgreSQL 17 service or the usual `%USERPROFILE%\.paperclip` location.
+The start script pins pnpm 9.15.4 and sets the app home, instance ID, loopback bind, and port in the same process. The reference instance uses embedded PostgreSQL under `%USERPROFILE%\.paperclip\instances\default\db`; it does not connect to the separate PostgreSQL service. `Start-M0.ps1` retains the earlier isolated `m0` configuration under the repository.
 
 ## Agent API credentials
 
@@ -28,14 +61,12 @@ token when `PAPERCLIP_AGENT_JWT_SECRET` (or `BETTER_AUTH_SECRET`) is set — see
 `server/src/agent-auth-jwt.ts`. With neither set, `createLocalAgentJwt` returns
 `null`, runs start without a usable key, and **every agent write fails with 401**.
 
-`Start-M0.ps1` handles this automatically:
+`Start-Default.ps1` reads the stable secret from
+`%USERPROFILE%\.paperclip\agent-jwt-secret.txt`:
 
-- On first run it generates 48 random bytes and stores them base64-encoded in
-  `C:\Crewspan\.paperclip-home\agent-jwt-secret.txt`.
-- Every later run reads that same file, so the secret is stable across restarts
-  and previously issued run tokens keep validating.
-- The value lives only in that file. It is not in the script and not in git:
-  `.paperclip-home/` is ignored by both `.gitignore` and `.git/info/exclude`.
+- The launcher fails if this file is missing or empty. Restore it from the
+  instance backup rather than generating a new value.
+- The value lives only in that file. It is not in the script or repository.
 
 Operational notes:
 
@@ -47,7 +78,7 @@ Operational notes:
   for this instance. It is not encrypted at rest and relies on Windows file
   permissions.
 - Tokens are scoped per instance and per company, and default to a 48h TTL
-  (`PAPERCLIP_AGENT_JWT_TTL_SECONDS`). The `instance_id` claim is `m0` here, so
+  (`PAPERCLIP_AGENT_JWT_TTL_SECONDS`). The `instance_id` claim is `default` here, so
   a token minted by this instance will not authenticate against another one.
 
 To confirm an agent run actually received working credentials, run this from
@@ -69,7 +100,7 @@ The frozen-lockfile dependency install downloaded all 1,292 packages and built t
 
 ## Development notes
 
-- `Start-M0.ps1` runs the server directly with the built UI. Restart it after server code changes; rebuild the UI after UI changes with `npm exec --yes --package=pnpm@9.15.4 -- pnpm --filter @paperclipai/ui build`.
+- `Start-Default.ps1` uses the built server and UI. Restart it after server code changes; rebuild the workspace before returning to production mode. Use `-Mode dev` only for the documented rollback.
 - The Codex model picker reads the installed Codex CLI model catalog and includes `gpt-6-luna`. All Crewspan agents use that model with high reasoning.
 - OpenCode Go has its own AI connection and model catalog. The local Board has a personal OpenCode Go connection imported from the already configured OpenCode CLI account; no key is stored in this repository.
 - The Onboarding project has `C:\Crewspan` as its primary local workspace for the M0 fork inventory. The agent reporting tree and current M0 scope are recorded in [the handoff](doc/plans/2026-09-24-crewspan-m0-handoff.md).
