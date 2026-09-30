@@ -2,6 +2,8 @@
 
 Guidance for human and AI contributors working in this repository.
 
+> **Crewspan fork — read this first.** This repository is the **Crewspan** fork of Paperclip. Before anything else, read **`doc/plans/2026-09-30-m1-handoff.md`**. It records the M0 outcome (**Go with changes**, with the concrete reasons the spike verification was not possible at this stage), what carried into M1, the constraints that must not be broken, and the **first M1 priority: a self-updating Windows desktop release**. M0 is closed; M1 is authorised.
+
 ## 1. Purpose
 
 Paperclip is a control plane for AI-agent companies.
