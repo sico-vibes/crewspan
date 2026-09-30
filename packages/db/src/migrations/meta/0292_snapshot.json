@@ -1,6 +1,6 @@
 {
-  "id": "239dfc30-3531-48b5-a06f-72608de479da",
-  "prevId": "a02dd1cf-75c9-4c4d-b13d-cf5dcd729ad3",
+  "id": "a02dd1cf-75c9-4c4d-b13d-cf5dcd729ad3",
+  "prevId": "26315a87-4675-4dea-9634-efe5e878cc7d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -12775,12 +12775,6 @@
         "description": {
           "name": "description",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "inspection": {
-          "name": "inspection",
-          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
