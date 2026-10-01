@@ -26,6 +26,27 @@ code and no `windows-latest` job exist yet.
 6. **Workflow limits.** Codex runs in a Linux container and cannot build or run a Windows installer. Windows
    behaviour is proven only by Windows CI and by the owner's manual test (section 6).
 
+## Implementation update (2026-10-01)
+
+Measured and proven on Linux while implementing T1-T4. These override the original plan text where they differ.
+
+- **Packaging recipe (replaces `pnpm deploy`).** `pnpm --filter @paperclipai/server deploy --prod` gave 1.4 GB, 45,541 files and 1,738 symlinks, which a Windows installer
+  cannot carry. Instead: (1) full install and build; (2) in a clean checkout, `pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@paperclipai/server..."
+  --config.node-linker=hoisted` (about 5 s, no symlinks except `.bin`); (3) `scripts/desktop/stage-server.mjs` copies the built server, the UI and the needed workspace
+  packages (as real directories under `app/node_modules/@paperclipai`) into a stage folder; (4) run with the pinned Node and the tsx loader, as upstream's Dockerfile does.
+  Layout: `runtime/`, `sidecar/entry.mjs`, `app/server/{dist,ui-dist,skills}`, `app/node_modules`. (The plan text said `app/ui-dist`; the built layout is `app/server/ui-dist`.)
+- **Real Linux end-to-end run passed**: pinned Node 24.21.0 + tsx + `entry.mjs` + the real built server + embedded PostgreSQL. READY in about 15-18 s on first run, `/api/health` ok,
+  UI served (HTTP 200), server and Postgres bound to `127.0.0.1` only, clean shutdown with no leftover process and no stale `postmaster.pid`.
+- **Size.** Linux stage: 86,308 files and 2.7 GB. Pruning `*.d.ts` and `*.map` from `node_modules` (on by default, `--no-prune` to disable) gives 52,136 files and 2.25 GB. The
+  payload is dominated by bundled agent CLI binaries (Claude, Codex, OpenCode). Windows has one variant of each, so it is smaller. Expect a large installer.
+- **Windows MAX_PATH.** Worst relative path is 182 characters; with a 60-character install prefix the worst case is 242 of 259. The default per-user install path is
+  `C:\Users\<name>\AppData\Local\Crewspan\`.
+- **The shell must never create `config.json`.** The server accepts a missing config (defaults, embedded Postgres) but rejects an empty `{}`. The sidecar only needs the config
+  *path*, to place its `.env` secrets file next to it.
+- **Gate fix.** `node --test <directory>` does not work; name the test files.
+- **Tauri cannot be compiled in the Linux container** (no GTK/WebKit). Only the `windows-latest` CI job and the owner's machine compile and run the shell.
+- **First beta ships without the auto-updater** (no signing key exists yet). It is a pre-release. The updater follows once the owner has generated the key pair.
+
 ---
 
 # Crewspan M1 P1: Windows desktop beta (Tauri shell, sidecar, GitHub Releases auto-update)
