@@ -7,8 +7,42 @@
     <style>
       :root { color-scheme: light dark; font: 16px system-ui, sans-serif; }
       body { min-height: 100vh; margin: 0; display: grid; place-items: center; }
-      main { text-align: center; }
+      main { width: min(28rem, calc(100vw - 3rem)); text-align: center; }
+      #elapsed { opacity: .7; font-variant-numeric: tabular-nums; }
+      #slow-start { min-height: 1.5em; opacity: .8; }
+      .track { height: .3rem; margin: 1.5rem 0 0; overflow: hidden; border-radius: 1rem; background: color-mix(in srgb, currentColor 16%, transparent); }
+      .track::after { display: block; width: 40%; height: 100%; border-radius: inherit; background: currentColor; content: ""; animation: drift 1.6s ease-in-out infinite alternate; }
+      @keyframes drift { from { transform: translateX(-10%); } to { transform: translateX(165%); } }
+      @media (prefers-reduced-motion: reduce) { .track::after { animation: none; margin-left: 30%; } }
     </style>
   </head>
-  <body><main><h1>Crewspan</h1><p>Starting Crewspan…</p></main></body>
+  <body>
+    <main>
+      <h1>Crewspan</h1>
+      <p id="phase" aria-live="polite">Starting…</p>
+      <p id="elapsed">0:00</p>
+      <p id="slow-start" aria-live="polite"></p>
+      <div class="track" aria-hidden="true"></div>
+    </main>
+    <script>
+      (() => {
+        const started = performance.now();
+        const phase = document.getElementById("phase");
+        const elapsed = document.getElementById("elapsed");
+        const slowStart = document.getElementById("slow-start");
+        window.crewspanSetPhase = (progress) => {
+          if (typeof progress?.phase === "string") phase.textContent = progress.phase;
+          if (typeof progress?.elapsedMs === "number") {
+            const seconds = Math.floor(progress.elapsedMs / 1000);
+            elapsed.textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+          }
+        };
+        setInterval(() => {
+          const seconds = Math.floor((performance.now() - started) / 1000);
+          elapsed.textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+          if (seconds >= 10) slowStart.textContent = "The first start can take a few minutes.";
+        }, 250);
+      })();
+    </script>
+  </body>
 </html>

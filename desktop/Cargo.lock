@@ -592,11 +592,15 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
+ "tokio",
 ]
 
 [[package]]
 name = "crewspan-shell-logic"
 version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
 
 [[package]]
 name = "crewspan-sidecar-core"

@@ -8,6 +8,20 @@ use std::{
 
 const READY: &str = "CREWSPAN_SIDECAR_READY ";
 const ERROR: &str = "CREWSPAN_SIDECAR_ERROR ";
+pub(crate) const TIMING: &str = "CREWSPAN_SIDECAR_TIMING ";
+
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct StartupTiming {
+    pub node_boot_ms: Option<u64>,
+    pub seed_ms: Option<u64>,
+    pub import_ms: Option<u64>,
+    pub start_server_ms: Option<u64>,
+}
+
+pub(crate) fn parse_timing_line(line: &str) -> Option<StartupTiming> {
+    let json = line.strip_prefix(TIMING)?;
+    serde_json::from_str(json).ok()
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ReadyParse {

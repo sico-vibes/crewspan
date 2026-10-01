@@ -70,7 +70,12 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: repo/desktop
+
       - name: Cargo tests (sidecar core and shell logic)
+        timeout-minutes: 15
         shell: pwsh
         working-directory: repo/desktop
         run: cargo test --locked --workspace
@@ -111,6 +116,23 @@ jobs:
         shell: pwsh
         run: |
           node repo/scripts/desktop/stage-server.mjs --repo repo --prod-modules prod/node_modules --out repo/desktop/stage --node-dir "$env:NODE_DIR" --platform win32-x64 --require-runtime --force
+
+      - name: Build embedded database template (optional acceleration)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $started = [Diagnostics.Stopwatch]::StartNew()
+          node repo/scripts/desktop/build-db-template.mjs --stage repo/desktop/stage
+          $templateExit = $LASTEXITCODE
+          $started.Stop()
+          if ($templateExit -eq 0) {
+            $templateBytes = (Get-ChildItem repo/desktop/stage/db-template -Recurse -File | Measure-Object -Property Length -Sum).Sum
+            Write-Host "Database template size: $templateBytes bytes"
+          } else {
+            Write-Host "Database template unavailable; sidecar will use the slow initialization path."
+          }
+          Write-Host "Database template build time: $($started.ElapsedMilliseconds) ms"
 
       - name: Set release version
         shell: pwsh

@@ -11,6 +11,11 @@ import { waitForPendingRunFailureReports } from "./services/run-failure-report.j
 import { verifyStoppedNativeSessionForReplacement } from "./services/native-runtime/native-session-executor.js";
 import { embeddedPostgresOwnerPort } from "./embedded-postgres-owner.js";
 import { applyCleanWindowsStop } from "./embedded-postgres-windows-stop.js";
+import {
+  EMBEDDED_POSTGRES_INITDB_FLAGS,
+  EMBEDDED_POSTGRES_PASSWORD,
+  EMBEDDED_POSTGRES_USER,
+} from "./embedded-postgres-options.js";
 import { deliverExecutionStatuses } from "./services/execution-status-delivery.js";
 import { deliverReconciledExecutions, settleUnrecoverableExecutions } from "./services/execution-recovery-resolution.js";
 import { reconcileSafeNativeReplacements } from "./services/native-runtime/native-safe-replacement.js";
@@ -545,11 +550,11 @@ async function startServerWithDatabaseTeardown(
         logger.info(`Using embedded PostgreSQL because no DATABASE_URL set (dataDir=${dataDir}, port=${port})`);
         const createEmbeddedPostgres = () => applyCleanWindowsStop(new EmbeddedPostgres({
           databaseDir: dataDir,
-          user: "paperclip",
-          password: "paperclip",
+          user: EMBEDDED_POSTGRES_USER,
+          password: EMBEDDED_POSTGRES_PASSWORD,
           port,
           persistent: true,
-          initdbFlags: ["--encoding=UTF8", "--locale=C", "--lc-messages=C"],
+          initdbFlags: [...EMBEDDED_POSTGRES_INITDB_FLAGS],
           onLog: appendEmbeddedPostgresLog,
           onError: appendEmbeddedPostgresLog,
         }), { databaseDir: dataDir, log: (m) => logger.warn(m) });
