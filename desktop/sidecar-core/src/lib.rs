@@ -153,6 +153,14 @@ mod tests {
             "file:///C:/Program%20Files/x.mjs"
         );
         assert_eq!(
+            path_to_file_url(r"\\?\C:\Users\a b\x.mjs"),
+            "file:///C:/Users/a%20b/x.mjs"
+        );
+        assert_eq!(
+            crate::protocol::strip_verbatim_prefix(r"\\?\UNC\srv\share\x"),
+            r"\\srv\share\x"
+        );
+        assert_eq!(
             path_to_file_url("/tmp/café.mjs"),
             "file:///tmp/caf%C3%A9.mjs"
         );
