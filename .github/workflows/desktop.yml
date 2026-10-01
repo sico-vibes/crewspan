@@ -63,7 +63,6 @@ jobs:
         with:
           version: 9.15.4
           run_install: false
-          cache: true
 
       - uses: actions/setup-node@v4
         with:
@@ -72,6 +71,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: repo/desktop
 
       - name: Cargo tests (sidecar core and shell logic)
         timeout-minutes: 15
