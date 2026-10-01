@@ -496,6 +496,21 @@ test('loader none is the default and stages materialized publish files only', as
   assert.equal((await verifyStage(f.out)).ok, true);
 });
 
+test('loader none tolerates missing optional files-list entries', async (t) => {
+  const f = fixture(t);
+  const alphaPackage = path.join(f.repo, 'packages/alpha/package.json');
+  const pkg = JSON.parse(fs.readFileSync(alphaPackage, 'utf8'));
+  pkg.publishConfig.files = ['dist', 'skills'];
+  fs.writeFileSync(alphaPackage, JSON.stringify(pkg));
+
+  const manifest = await stageServer({ ...opts(f), loader: 'none' });
+  const alpha = path.join(f.out, 'app/node_modules/@paperclipai/alpha');
+  assert.equal(manifest.loader, 'none');
+  assert.equal(fs.existsSync(path.join(alpha, 'dist/index.js')), true);
+  assert.equal(fs.existsSync(path.join(alpha, 'skills')), false);
+  assert.equal((await verifyStage(f.out)).ok, true);
+});
+
 test('loader none rejects TypeScript and missing materialized export targets', async (t) => {
   const f = fixture(t);
   const alphaPackage = path.join(f.repo, 'packages/alpha/package.json');
@@ -507,6 +522,18 @@ test('loader none rejects TypeScript and missing materialized export targets', a
   pkg.publishConfig.exports = { '.': './dist/missing.js' };
   fs.writeFileSync(alphaPackage, JSON.stringify(pkg));
   await assert.rejects(stageServer({ ...opts(f), loader: 'none' }), /Missing export target.*dist\/missing\.js/);
+
+  fs.rmSync(f.out, { recursive: true, force: true });
+  delete pkg.publishConfig.exports;
+  pkg.publishConfig.main = './dist/missing-main.js';
+  fs.writeFileSync(alphaPackage, JSON.stringify(pkg));
+  await assert.rejects(stageServer({ ...opts(f), loader: 'none' }), /Missing export target.*dist\/missing-main\.js/);
+
+  fs.rmSync(f.out, { recursive: true, force: true });
+  delete pkg.publishConfig.main;
+  pkg.publishConfig.bin = { alpha: './dist/missing-bin.ts' };
+  fs.writeFileSync(alphaPackage, JSON.stringify(pkg));
+  await assert.rejects(stageServer({ ...opts(f), loader: 'none' }), /TypeScript export target.*missing-bin\.ts/);
 });
 
 test('loader none resolves workspace imports throughout staged dist trees without a loader', async (t) => {

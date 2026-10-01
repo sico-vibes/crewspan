@@ -208,6 +208,26 @@ function exportTargets(exportsValue, key = '') {
 
 const TS_EXTENSIONS = /\.(?:ts|mts|cts|tsx)$/i;
 
+function manifestTargets(manifest) {
+  const targets = exportTargets(manifest.exports).filter((target) => !target.includes('*'));
+  if (typeof manifest.main === 'string') targets.push(manifest.main);
+  if (typeof manifest.bin === 'string') targets.push(manifest.bin);
+  else if (manifest.bin && typeof manifest.bin === 'object' && !Array.isArray(manifest.bin)) {
+    targets.push(...Object.values(manifest.bin));
+  }
+  return targets;
+}
+
+async function validateManifestTargets(manifest, destination, packageName) {
+  for (const target of manifestTargets(manifest)) {
+    if (typeof target !== 'string') continue;
+    if (TS_EXTENSIONS.test(target)) throw new Error(`TypeScript export target for ${packageName}: ${target}`);
+    const relative = target.startsWith('./') ? target.slice(2) : target;
+    const stat = await lstatOrNull(path.join(destination, relative));
+    if (!stat?.isFile() || stat.isSymbolicLink()) throw new Error(`Missing export target for ${packageName}: ${target}`);
+  }
+}
+
 async function copyPublishFiles(source, destination, pkg, skippedSymlinks, stageRoot) {
   const manifest = materializePublishManifest(pkg);
   const files = pkg.publishConfig?.files ?? pkg.files;
@@ -219,21 +239,14 @@ async function copyPublishFiles(source, destination, pkg, skippedSymlinks, stage
     const from = path.join(source, relative);
     if (!(await lstatOrNull(from))) {
       if (['README', 'README.md', 'LICENSE', 'LICENSE.md', 'LICENCE', 'LICENCE.md'].includes(relative)) continue;
-      throw new Error(`Missing publish file for ${pkg.name}: ${relative}`);
+      continue;
     }
     await copyTree(from, path.join(destination, relative), {
       skippedSymlinks, stageRoot, excludeDirs: EXCLUDED_PACKAGE_DIRS, excludeTsBuildInfo: true,
     });
   }
   await fs.writeFile(path.join(destination, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
-  for (const target of exportTargets(manifest.exports)) {
-    if (typeof target !== 'string') continue;
-    if (TS_EXTENSIONS.test(target)) throw new Error(`TypeScript export target for ${pkg.name}: ${target}`);
-    if (!target.startsWith('./')) continue;
-    if (target.includes('*')) continue;
-    const stat = await lstatOrNull(path.join(destination, target.slice(2)));
-    if (!stat?.isFile() || stat.isSymbolicLink()) throw new Error(`Missing export target for ${pkg.name}: ${target}`);
-  }
+  await validateManifestTargets(manifest, destination, pkg.name);
 }
 
 function stagedWorkspaceImports(stageRoot) {
@@ -470,14 +483,7 @@ export async function stageServer(options = {}) {
     }
 
     if (loader === 'none') {
-      for (const target of exportTargets(materializePublishManifest(serverPackage).exports)) {
-        if (typeof target !== 'string') continue;
-        if (TS_EXTENSIONS.test(target)) throw new Error(`TypeScript export target for ${serverPackage.name}: ${target}`);
-        if (!target.startsWith('./')) continue;
-        if (target.includes('*')) continue;
-        const stat = await lstatOrNull(path.join(partial, 'app/server', target.slice(2)));
-        if (!stat?.isFile() || stat.isSymbolicLink()) throw new Error(`Missing export target for ${serverPackage.name}: ${target}`);
-      }
+      await validateManifestTargets(materializePublishManifest(serverPackage), path.join(partial, 'app/server'), serverPackage.name);
     }
 
     await fs.mkdir(path.join(partial, 'sidecar'), { recursive: true });

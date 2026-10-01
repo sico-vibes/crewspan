@@ -36,6 +36,10 @@ Read, in this order: `AGENTS.md` → `doc/plans/2026-09-30-m1-handoff.md` → `d
 
 Then, in order: prove **S3** containment; measure **M2 retrofit sizing** and **upstream sync cost**; complete **S1/S2/S4–S7** as M1 exit criteria.
 
+## 3b. Current status
+
+See `doc/plans/2026-10-01-desktop-handoff-status.md` for how far the desktop beta got, open PR #13 and next steps.
+
 ## 4. Guardrails
 
 - Keep the **server + SPA monolith** — desktop is a shell, not a fork. One API client with a configurable base URL.
