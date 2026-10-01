@@ -78,3 +78,26 @@ this work (Storybook viewport config, CLI proxy env).
   (it restarts when a scheduled check-in fires while a job is running); OpenCode QA sometimes times out with no
   output (re-run it); every worktree needs its own lane approval.
 - Windows sidecar log for diagnostics: `%LOCALAPPDATA%\io.github.sicovibes.crewspan\logs\sidecar.log`.
+
+## Latest Windows CI result (PR #13, head f5c734f) — FAILED, not yet fixed
+
+Run 36921438434 (job 110568206934) failed at the **stage** step, before the DB template and the installer:
+
+```
+Staged workspace import resolution failed without a loader:
+  @paperclipai/paperclip-eval-kernel, @paperclipai/paperclip-runner, @paperclipai/paperclip-runner/live
+```
+
+The new no-tsx staging (`scripts/desktop/stage-server.mjs`, default `--loader none`) resolver check cannot resolve
+these three workspace imports from the staged tree. Cause not yet diagnosed. Likely: those packages have no built
+JS export target (or are not staged), or they are not needed at runtime and the check is too strict.
+
+Options, in order of preference:
+1. Inspect `package.json` exports of `@paperclipai/paperclip-eval-kernel` and `paperclip-runner`; make sure their
+   built `dist` is materialised and staged, then re-run staging locally (`node scripts/desktop/stage-server.mjs ...`).
+2. If the imports are only reached via optional/dev code paths, limit the resolver check to runtime-required entry
+   points instead of failing on every import.
+3. Fallback: pass `--loader tsx` in `.github/workflows/desktop.yml` (known-good, slower start) to get a beta.3 out,
+   and keep no-tsx as follow-up work.
+
+Nothing after the stage step (db template, tray, installer, update path) has run on Windows with these changes.
