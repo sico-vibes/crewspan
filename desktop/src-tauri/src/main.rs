@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod updater;
+
 use crewspan_shell_logic::{
     navigation_decision, stage_paths, NavigationDecision, SERVER_PORT, SERVER_URL,
 };
@@ -16,7 +18,7 @@ use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindow, WebviewWindowBuilder, 
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_opener::OpenerExt;
 
-struct Lifecycle {
+pub(crate) struct Lifecycle {
     state: Mutex<LifecycleState>,
     changed: Condvar,
     stop_sender: mpsc::Sender<()>,
@@ -40,6 +42,18 @@ impl Lifecycle {
             shutdown_complete: AtomicBool::new(false),
         }
     }
+
+    pub(crate) fn stop_for_update(&self) {
+        if !self.shutdown_started.swap(true, Ordering::SeqCst) {
+            let _ = self.stop_sender.send(());
+        }
+
+        let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
+        while state.starting || state.sidecar_running {
+            state = self.changed.wait(state).unwrap_or_else(|p| p.into_inner());
+        }
+        self.shutdown_complete.store(true, Ordering::SeqCst);
+    }
 }
 
 fn main() {
@@ -61,6 +75,7 @@ fn main() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             let paths = resolve_stage_paths(app)?;
             let data_home = app.path().app_local_data_dir()?.join("crewspan");
@@ -222,6 +237,7 @@ fn start_sidecar_worker<R: tauri::Runtime>(
                         let _ = window.navigate(url);
                     }
                 }
+                updater::check_once(app.clone(), Arc::clone(&lifecycle));
                 let _ = stop_receiver.recv();
                 sidecar.stop();
                 let mut state = lifecycle.state.lock().unwrap_or_else(|p| p.into_inner());

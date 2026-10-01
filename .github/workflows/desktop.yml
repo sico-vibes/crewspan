@@ -3,7 +3,7 @@ name: Desktop (Windows)
 # Builds the Crewspan Windows installer (Tauri shell + staged server sidecar).
 # - pull_request touching desktop files: build only, upload the installer as a workflow artifact.
 # - workflow_dispatch with `publish: true`: also publish a GitHub pre-release with the installer.
-# The first beta ships without the auto-updater (needs the owner's Tauri signing key).
+# Published installers are signed for the Tauri updater; Windows code signing is not configured.
 
 on:
   pull_request:
@@ -115,6 +115,9 @@ jobs:
       - name: Build NSIS installer
         shell: pwsh
         working-directory: repo/desktop/src-tauri
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npx --yes @tauri-apps/cli@2 build --bundles nsis
 
       - name: Collect installer and checksums
@@ -124,6 +127,9 @@ jobs:
           $exe = Get-ChildItem repo/desktop -Recurse -Filter "*setup.exe" | Where-Object { $_.FullName -match 'bundle' } | Select-Object -First 1
           if (-not $exe) { throw "No NSIS installer produced" }
           Copy-Item $exe.FullName out/
+          $sig = "$($exe.FullName).sig"
+          if (-not (Test-Path $sig)) { throw "No updater signature produced next to $($exe.Name)" }
+          Copy-Item $sig out/
           Push-Location out
           Get-ChildItem *.exe | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } | Set-Content SHA256SUMS.txt -Encoding ascii
           Get-Content SHA256SUMS.txt
@@ -144,4 +150,39 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "v$env:APP_VERSION"
-          gh release create $tag out/* --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Crewspan $env:APP_VERSION (Windows beta)" --prerelease --notes "Windows beta installer. Unsigned: Windows SmartScreen will warn (More info, Run anyway). No auto-update in this build. Verify the download against SHA256SUMS.txt."
+          gh release create $tag out/* --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Crewspan $env:APP_VERSION (Windows beta)" --prerelease --notes "Windows beta installer. Unsigned: Windows SmartScreen will warn (More info, Run anyway). The updater feed is published to the desktop-updates release. Verify the download against SHA256SUMS.txt."
+
+      - name: Publish updater feed
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $exe = Get-ChildItem out -Filter "*setup.exe" | Select-Object -First 1
+          if (-not $exe) { throw "No installer found in out" }
+          $sigPath = Join-Path out "$($exe.Name).sig"
+          if (-not (Test-Path $sigPath)) { throw "No updater signature found for $($exe.Name)" }
+          $signature = (Get-Content $sigPath -Raw).Trim()
+          if (-not $signature) { throw "Updater signature is empty" }
+          $feed = [ordered]@{
+            version = $env:APP_VERSION
+            notes = "Crewspan $env:APP_VERSION (Windows beta)"
+            pub_date = [DateTimeOffset]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            platforms = @{
+              "windows-x86_64" = @{
+                signature = $signature
+                url = "https://github.com/${{ github.repository }}/releases/download/v$env:APP_VERSION/$($exe.Name)"
+              }
+            }
+          }
+          $json = $feed | ConvertTo-Json -Depth 10
+          $latestPath = Join-Path $env:RUNNER_TEMP "latest.json"
+          [IO.File]::WriteAllText($latestPath, $json, [Text.UTF8Encoding]::new($false))
+          Get-Content $latestPath -Raw | ConvertFrom-Json | Out-Null
+          gh release view desktop-updates --repo "${{ github.repository }}" 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create desktop-updates --repo "${{ github.repository }}" --prerelease --title "Desktop update feed" --notes "Update feed for the Crewspan desktop app. Do not delete." --target "${{ github.sha }}"
+            if ($LASTEXITCODE -ne 0) { throw "Could not create desktop-updates release" }
+          }
+          gh release upload desktop-updates $latestPath --repo "${{ github.repository }}" --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Could not upload latest.json" }
