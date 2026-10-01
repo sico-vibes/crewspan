@@ -1,0 +1,9 @@
+[package]
+name = "crewspan-shell-logic"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Tauri-free path and navigation logic for the Crewspan desktop shell"
+
+[lib]
+path = "src/lib.rs"

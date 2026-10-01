@@ -1,0 +1,147 @@
+name: Desktop (Windows)
+
+# Builds the Crewspan Windows installer (Tauri shell + staged server sidecar).
+# - pull_request touching desktop files: build only, upload the installer as a workflow artifact.
+# - workflow_dispatch with `publish: true`: also publish a GitHub pre-release with the installer.
+# The first beta ships without the auto-updater (needs the owner's Tauri signing key).
+
+on:
+  pull_request:
+    paths:
+      - "desktop/**"
+      - "scripts/desktop/**"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without the leading v (for example 0.1.0-beta.1)"
+        required: true
+        type: string
+      publish:
+        description: "Publish a GitHub pre-release with the installer"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    env:
+      CARGO_TERM_COLOR: never
+    steps:
+      - name: Enable long paths
+        shell: pwsh
+        run: git config --system core.longpaths true
+
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 9.15.4
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cargo tests (sidecar core and shell logic)
+        shell: pwsh
+        working-directory: repo/desktop
+        run: cargo test --locked --workspace
+
+      - name: Install dependencies and build
+        shell: pwsh
+        working-directory: repo
+        run: |
+          # main's pnpm-lock.yaml can lag; refresh resolution only in this CI workspace, never committed.
+          pnpm install --resolution-only --ignore-scripts --ignore-pnpmfile --no-frozen-lockfile
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - uses: actions/checkout@v4
+        with:
+          path: prod
+
+      - name: Hoisted production install (no links)
+        shell: pwsh
+        working-directory: prod
+        run: |
+          pnpm install --resolution-only --ignore-scripts --ignore-pnpmfile --no-frozen-lockfile
+          pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@paperclipai/server..." --config.node-linker=hoisted
+
+      - name: Fetch pinned Node runtime
+        shell: pwsh
+        run: |
+          $cfg = Get-Content repo/scripts/desktop/node-runtime.json -Raw | ConvertFrom-Json
+          $entry = $cfg.node.'win32-x64'
+          Invoke-WebRequest -Uri $entry.url -OutFile node.zip
+          $actual = (Get-FileHash node.zip -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $entry.sha256.ToLower()) { throw "Node runtime checksum mismatch: $actual" }
+          Expand-Archive node.zip -DestinationPath node-extract
+          $dir = Get-ChildItem node-extract -Directory | Select-Object -First 1
+          echo "NODE_DIR=$($dir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Stage the server payload
+        shell: pwsh
+        run: |
+          node repo/scripts/desktop/stage-server.mjs --repo repo --prod-modules prod/node_modules --out repo/desktop/stage --node-dir "$env:NODE_DIR" --platform win32-x64 --require-runtime --force
+
+      - name: Set release version
+        shell: pwsh
+        working-directory: repo/desktop/src-tauri
+        run: |
+          $v = '${{ inputs.version }}'
+          if (-not $v) { $v = '0.1.0' }
+          if ($v -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$') { throw "Bad version: $v" }
+          $conf = Get-Content tauri.conf.json -Raw | ConvertFrom-Json
+          $conf.version = $v
+          $conf | ConvertTo-Json -Depth 20 | Set-Content tauri.conf.json -Encoding utf8
+          echo "APP_VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build NSIS installer
+        shell: pwsh
+        working-directory: repo/desktop/src-tauri
+        run: npx --yes @tauri-apps/cli@2 build --bundles nsis
+
+      - name: Collect installer and checksums
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          $exe = Get-ChildItem repo/desktop -Recurse -Filter "*setup.exe" | Where-Object { $_.FullName -match 'bundle' } | Select-Object -First 1
+          if (-not $exe) { throw "No NSIS installer produced" }
+          Copy-Item $exe.FullName out/
+          Push-Location out
+          Get-ChildItem *.exe | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } | Set-Content SHA256SUMS.txt -Encoding ascii
+          Get-Content SHA256SUMS.txt
+          Get-ChildItem | Format-Table Name, Length
+          Pop-Location
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crewspan-windows-installer
+          path: out/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish pre-release
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v$env:APP_VERSION"
+          gh release create $tag out/* --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Crewspan $env:APP_VERSION (Windows beta)" --prerelease --notes "Windows beta installer. Unsigned: Windows SmartScreen will warn (More info, Run anyway). No auto-update in this build. Verify the download against SHA256SUMS.txt."
