@@ -99,6 +99,19 @@ its secrets.
 
 ## 8. Known caveats
 
+- **Every git worktree needs its own lane approval.** The approval is stored per worktree in git metadata.
+  A relay run from a fresh worktree stops with "project fleet config is not trusted". Run the `config.mjs write
+  --scope project` command from step 5 of section 7 with `--cwd <worktree>` before dispatching.
+- **Use a separate worktree per delegated task.** Codex and OpenCode then cannot disturb the PR branch. Codex's
+  sandbox blocks child processes, so it cannot run test suites that spawn them. It says so in its report. The
+  lead runs those tests, because the lead is not sandboxed the same way.
+- **`pnpm install --frozen-lockfile` can fail on a fresh checkout.** `pnpm-lock.yaml` on `main` lags (only patch
+  hashes) because the refresh workflow runs on `master`, not `main`. In a scratch worktree run
+  `pnpm install --resolution-only --ignore-scripts --no-frozen-lockfile`, then `pnpm install --frozen-lockfile`. Never
+  commit the changed lockfile: the PR policy (`ci / policy`) rejects it.
+- **Gate commands must be checked.** `node --test <directory>` does not work. Name the test files.
+- **QA finds real defects.** On T1 the QA agent found seven defects that 11 passing tests missed. Always run it.
+
 - **Discovery shows OpenCode as unauthenticated.** `delegate-setup`'s probe looks for `●` (U+25CF), but
   OpenCode 1.18.x prints `•` (U+2022). This is a false negative in the probe. Verify with a real request.
 - **The model alias is not pinned.** The Agent tool accepts only the alias `opus`, and this project has
