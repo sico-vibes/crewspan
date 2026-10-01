@@ -70,7 +70,20 @@ pub fn parse_error_line(line: &str) -> Option<SidecarError> {
     })
 }
 
+/// Windows APIs can return "verbatim" paths (`\\?\C:\dir`). Node rejects the
+/// matching file URL, so convert them to the ordinary drive form first.
+pub fn strip_verbatim_prefix(path: &str) -> String {
+    if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{rest}")
+    } else if let Some(rest) = path.strip_prefix(r"\\?\") {
+        rest.to_owned()
+    } else {
+        path.to_owned()
+    }
+}
+
 pub fn path_to_file_url(path: &str) -> String {
+    let path = strip_verbatim_prefix(path);
     let normalized = path.replace('\\', "/");
     let absolute = if normalized.starts_with('/') {
         normalized

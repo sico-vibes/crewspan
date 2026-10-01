@@ -14,7 +14,21 @@ pub struct StagePaths {
 
 /// Build the staged runtime paths. `windows` controls the executable suffix so
 /// both target layouts can be tested on any host.
+/// Tauri returns Windows resource paths in verbatim form (`\\?\C:\dir`), which
+/// Node cannot turn into a file URL. Use the ordinary drive form instead.
+pub fn plain_path(path: &Path) -> PathBuf {
+    let text = path.to_string_lossy();
+    if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+        PathBuf::from(format!(r"\\{rest}"))
+    } else if let Some(rest) = text.strip_prefix(r"\\?\") {
+        PathBuf::from(rest)
+    } else {
+        path.to_path_buf()
+    }
+}
+
 pub fn stage_paths(stage_dir: &Path, windows: bool) -> StagePaths {
+    let stage_dir = &plain_path(stage_dir);
     StagePaths {
         node: stage_dir
             .join("runtime")
@@ -61,6 +75,24 @@ pub fn navigation_decision(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn verbatim_windows_prefixes_are_removed() {
+        assert_eq!(
+            plain_path(Path::new(r"\\?\C:\Users\a\stage")),
+            PathBuf::from(r"C:\Users\a\stage")
+        );
+        assert_eq!(
+            plain_path(Path::new(r"\\?\UNC\srv\share\stage")),
+            PathBuf::from(r"\\srv\share\stage")
+        );
+        assert_eq!(
+            plain_path(Path::new("/opt/stage")),
+            PathBuf::from("/opt/stage")
+        );
+        let paths = stage_paths(Path::new(r"\\?\C:\App\stage"), true);
+        assert_eq!(paths.working_dir, PathBuf::from(r"C:\App\stage"));
+    }
 
     #[test]
     fn stage_paths_use_windows_executable_name() {
