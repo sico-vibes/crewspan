@@ -1,6 +1,6 @@
 # M1 P1: Windows desktop beta - plan
 
-**Status:** planned 2026-09-30. Not started. **Author of the plan:** Claude Opus 5.5 (effort high, read-only),
+**Status:** implementation underway; Windows release proof remains outstanding. **Author of the plan:** Claude Opus 5.5 (effort high, read-only),
 dispatched through the `plan` lane of the AI orchestration layer (`doc/AI-ORCHESTRATION.md`).
 The planner changed no files. The lead reviewed the plan and spot-checked its key claims against the repo.
 
@@ -28,7 +28,7 @@ code and no `windows-latest` job exist yet.
 
 ## Implementation update (2026-10-01)
 
-Measured and proven on Linux while implementing T1-T4. These override the original plan text where they differ.
+Implementation update recorded 2026-10-01. Linux evidence and source inspection are separated from Windows-only proof below.
 
 - **Packaging recipe (replaces `pnpm deploy`).** `pnpm --filter @paperclipai/server deploy --prod` gave 1.4 GB, 45,541 files and 1,738 symlinks, which a Windows installer
   cannot carry. Instead: (1) full install and build; (2) in a clean checkout, `pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@paperclipai/server..."
@@ -44,8 +44,13 @@ Measured and proven on Linux while implementing T1-T4. These override the origin
 - **The shell must never create `config.json`.** The server accepts a missing config (defaults, embedded Postgres) but rejects an empty `{}`. The sidecar only needs the config
   *path*, to place its `.env` secrets file next to it.
 - **Gate fix.** `node --test <directory>` does not work; name the test files.
-- **Tauri cannot be compiled in the Linux container** (no GTK/WebKit). Only the `windows-latest` CI job and the owner's machine compile and run the shell.
-- **First beta ships without the auto-updater** (no signing key exists yet). It is a pre-release. The updater follows once the owner has generated the key pair.
+- **Build phases now present in the repository:** staged server payload and entry script; Windows Postgres clean-stop support; Rust sidecar lifecycle core; Tauri shell with splash, tray, navigation guard, first-run progress and shutdown; Windows CI installer build; updater check/prompt/install wiring; and release workflow/feed generation. The sidecar startup reports named phases and timings to the splash and app log. A database template is built optionally in CI to accelerate first launch, with initialization fallback if it is unavailable.
+- **No-tsx staging is supported:** the stage manifest selects either the tsx loader or direct Node startup. The current Node 24.21.0 run used tsx; direct/no-tsx startup remains **UNPROVEN** until its staged path is exercised.
+- **Lifecycle polish in this update:** cancellable first-run startup, five-second sidecar process monitoring, and Restart/Quit recovery are implemented. Rust unit gates can validate the pure decision and lifecycle core, but the Tauri dialog and window navigation are **UNPROVEN** until a Windows GUI run.
+- **Local sandbox gate limits:** the ten sidecar loopback integration tests are **UNPROVEN** here because the sandbox denies test-port binding (`Operation not permitted`). The named Node gate passed the db-template, phase-marker and staging files; `desktop/sidecar/entry.test.mjs` is **UNPROVEN** in this sandbox because its child test process exits with code 1 without a diagnostic. Rerun those gates in ordinary CI.
+- **Tauri cannot be compiled in this Linux container** (no GTK/WebKit). The Windows target check and Windows CI job are separate gates; installer creation, first-run timing, process cleanup, tray behavior, updater signing/install, SmartScreen and clean-machine startup are **UNPROVEN** until those Windows runs succeed.
+- **Updater code and feed workflow are present**, but successful signed update installation is **UNPROVEN** until a Windows beta upgrades to a later release with the configured signing key and feed.
+- **NSIS compression uses zlib** to reduce installer build time in CI compared with higher-compression settings; this trades a potentially larger installer for faster packaging. Actual wall-time and output-size effects remain **UNPROVEN** until Windows CI measures them.
 
 ---
 

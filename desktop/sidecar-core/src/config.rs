@@ -3,9 +3,10 @@ use std::{path::PathBuf, time::Duration};
 #[derive(Clone, Debug)]
 pub struct SidecarConfig {
     pub node_path: PathBuf,
-    pub tsx_loader: PathBuf,
+    pub tsx_loader: Option<PathBuf>,
     pub entry_path: PathBuf,
     pub server_entry: Option<PathBuf>,
+    pub db_template: Option<PathBuf>,
     pub working_dir: PathBuf,
     pub data_home: PathBuf,
     pub instance_id: String,
@@ -21,7 +22,7 @@ pub struct SidecarConfig {
 impl SidecarConfig {
     pub fn new(
         node_path: PathBuf,
-        tsx_loader: PathBuf,
+        tsx_loader: Option<PathBuf>,
         entry_path: PathBuf,
         working_dir: PathBuf,
         data_home: PathBuf,
@@ -33,6 +34,7 @@ impl SidecarConfig {
             tsx_loader,
             entry_path,
             server_entry: None,
+            db_template: None,
             working_dir,
             data_home,
             instance_id: "desktop".into(),

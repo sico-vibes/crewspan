@@ -1,7 +1,10 @@
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+import { spawnSync } from 'node:child_process';
+import { materializePublishManifest } from '../prepare-bundled-package.mjs';
 
 const EXCLUDED_PACKAGE_DIRS = new Set(['node_modules', '.turbo', 'coverage', '.git']);
 const DEFAULT_PATH_BUDGET = 259;
@@ -193,6 +196,87 @@ async function pathMetrics(outDir) {
 
 function stableJson(value) { return `${JSON.stringify(value, null, 2)}\n`; }
 
+function exportTargets(exportsValue, key = '') {
+  if (key.toLowerCase() === 'types') return [];
+  if (typeof exportsValue === 'string') return [exportsValue];
+  if (Array.isArray(exportsValue)) return exportsValue.flatMap((value) => exportTargets(value, key));
+  if (exportsValue && typeof exportsValue === 'object') {
+    return Object.entries(exportsValue).flatMap(([childKey, value]) => exportTargets(value, childKey));
+  }
+  return [];
+}
+
+const TS_EXTENSIONS = /\.(?:ts|mts|cts|tsx)$/i;
+
+async function copyPublishFiles(source, destination, pkg, skippedSymlinks, stageRoot) {
+  const manifest = materializePublishManifest(pkg);
+  const files = pkg.publishConfig?.files ?? pkg.files;
+  if (!Array.isArray(files) || files.some((entry) => typeof entry !== 'string' || path.isAbsolute(entry) || entry.split(/[\\/]/).includes('..'))) {
+    throw new Error(`Invalid publish files list for ${pkg.name}`);
+  }
+  const entries = new Set(['package.json', ...files, 'README', 'README.md', 'LICENSE', 'LICENSE.md', 'LICENCE', 'LICENCE.md']);
+  for (const relative of entries) {
+    const from = path.join(source, relative);
+    if (!(await lstatOrNull(from))) {
+      if (['README', 'README.md', 'LICENSE', 'LICENSE.md', 'LICENCE', 'LICENCE.md'].includes(relative)) continue;
+      throw new Error(`Missing publish file for ${pkg.name}: ${relative}`);
+    }
+    await copyTree(from, path.join(destination, relative), {
+      skippedSymlinks, stageRoot, excludeDirs: EXCLUDED_PACKAGE_DIRS, excludeTsBuildInfo: true,
+    });
+  }
+  await fs.writeFile(path.join(destination, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+  for (const target of exportTargets(manifest.exports)) {
+    if (typeof target !== 'string') continue;
+    if (TS_EXTENSIONS.test(target)) throw new Error(`TypeScript export target for ${pkg.name}: ${target}`);
+    if (!target.startsWith('./')) continue;
+    if (target.includes('*')) continue;
+    const stat = await lstatOrNull(path.join(destination, target.slice(2)));
+    if (!stat?.isFile() || stat.isSymbolicLink()) throw new Error(`Missing export target for ${pkg.name}: ${target}`);
+  }
+}
+
+function stagedWorkspaceImports(stageRoot) {
+  const found = new Set();
+  const scanDist = (dir) => {
+    for (const entry of fsSync.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) scanDist(full);
+      else if (entry.isFile() && /\.(?:js|mjs|cjs)$/.test(entry.name)) {
+        const content = fsSync.readFileSync(full, 'utf8');
+        for (const match of content.matchAll(/(?:from\s*|import\s*\(?\s*|require\s*\(\s*)['"](@paperclipai\/[^'"]+)['"]/g)) found.add(match[1]);
+      }
+    }
+  };
+  const packageRoot = path.join(stageRoot, 'app/node_modules/@paperclipai');
+  const findDist = (dir) => {
+    for (const entry of fsSync.readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.name === 'dist') scanDist(full);
+      else findDist(full);
+    }
+  };
+  scanDist(path.join(stageRoot, 'app/server/dist'));
+  if (fsSync.existsSync(packageRoot)) findDist(packageRoot);
+  return [...found].sort(compareStrings);
+}
+
+function verifyWorkspaceResolution(stageRoot) {
+  const specifiers = stagedWorkspaceImports(stageRoot);
+  if (specifiers.length === 0) return;
+  const source = `for (const specifier of ${JSON.stringify(specifiers)}) { try { import.meta.resolve(specifier); } catch { console.error(specifier); process.exitCode = 1; } }`;
+  const env = { ...process.env };
+  delete env.NODE_OPTIONS;
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', source], {
+    cwd: path.join(stageRoot, 'app/server/dist'), encoding: 'utf8', windowsHide: true, env,
+  });
+  if (result.error || result.status !== 0) {
+    const unresolved = result.stderr?.trim() || result.stdout?.trim() || 'unknown resolver failure';
+    throw new Error(`Staged workspace import resolution failed without a loader: ${unresolved}`);
+  }
+}
+
 async function writeManifest(outDir, manifest) {
   const manifestPath = path.join(outDir, 'stage-manifest.json');
   let serialized;
@@ -303,6 +387,8 @@ async function publishStage(partial, outDir, hadExisting) {
 }
 
 export async function stageServer(options = {}) {
+  const loader = options.loader ?? 'none';
+  if (!['none', 'tsx'].includes(loader)) throw new Error(`Unsupported loader: ${loader}`);
   const repoInput = absolute(options.repo, '--repo');
   const modulesInput = absolute(options.prodModules, '--prod-modules');
   const repo = await canonicalRoot(repoInput, 'repo');
@@ -319,7 +405,7 @@ export async function stageServer(options = {}) {
 
   await requireFileWithin(repo, 'server/dist/index.js', `Missing built server entry: ${path.join(repo, 'server/dist/index.js')}`);
   const serverPackage = await readPackage(path.join(repo, 'server', 'package.json'), 'server package.json');
-  await requireFileWithin(prodModules, 'tsx/dist/loader.mjs', `Missing production tsx loader: ${path.join(prodModules, 'tsx/dist/loader.mjs')}`);
+  if (loader === 'tsx') await requireFileWithin(prodModules, 'tsx/dist/loader.mjs', `Missing production tsx loader: ${path.join(prodModules, 'tsx/dist/loader.mjs')}`);
   await requireFileWithin(sidecar, 'entry.mjs', `Missing sidecar entry: ${path.join(sidecar, 'entry.mjs')}`);
   if (nodeDir) await requireFileWithin(nodeDir, nodeName, `Missing bundled runtime: ${path.join(nodeDir, nodeName)}`);
   const serverUi = path.join(repo, 'server', 'ui-dist');
@@ -350,7 +436,11 @@ export async function stageServer(options = {}) {
     await fs.mkdir(path.join(partial, 'app', 'server'), { recursive: true });
     await fs.mkdir(path.join(partial, 'app', 'node_modules'), { recursive: true });
     await copyTree(path.join(repo, 'server', 'dist'), path.join(partial, 'app', 'server', 'dist'), { skippedSymlinks, stageRoot: partial });
-    await copyTree(path.join(repo, 'server', 'package.json'), path.join(partial, 'app', 'server', 'package.json'), { skippedSymlinks, stageRoot: partial });
+    if (loader === 'tsx') {
+      await copyTree(path.join(repo, 'server', 'package.json'), path.join(partial, 'app', 'server', 'package.json'), { skippedSymlinks, stageRoot: partial });
+    } else {
+      await fs.writeFile(path.join(partial, 'app/server/package.json'), `${JSON.stringify(materializePublishManifest(serverPackage), null, 2)}\n`, 'utf8');
+    }
     await copyTree(selectedUi, path.join(partial, 'app', 'server', 'ui-dist'), { skippedSymlinks, stageRoot: partial });
     const skills = path.join(repo, 'server', 'skills');
     if ((await lstatOrNull(skills))?.isDirectory()) {
@@ -362,6 +452,7 @@ export async function stageServer(options = {}) {
       skippedSymlinks, stageRoot: partial, excludeDirs: new Set(['.bin', '.cache']),
       pruneModuleFiles: pruneEnabled, pruned,
     });
+    if (loader === 'none') await fs.rm(path.join(partial, 'app/node_modules/tsx'), { recursive: true, force: true });
 
     for (const name of closure) {
       validateWorkspaceName(name);
@@ -369,13 +460,30 @@ export async function stageServer(options = {}) {
       const target = path.join(scope, name.slice('@paperclipai/'.length));
       if (!destinationIsInside(scope, target)) throw new Error(`Workspace package destination escapes @paperclipai scope: ${name}`);
       await fs.rm(target, { recursive: true, force: true });
-      await copyTree(packageMap.get(name).dir, target, {
-        skippedSymlinks, stageRoot: partial, excludeDirs: EXCLUDED_PACKAGE_DIRS, excludeTsBuildInfo: true,
-      });
+      if (loader === 'tsx') {
+        await copyTree(packageMap.get(name).dir, target, {
+          skippedSymlinks, stageRoot: partial, excludeDirs: EXCLUDED_PACKAGE_DIRS, excludeTsBuildInfo: true,
+        });
+      } else {
+        await copyPublishFiles(packageMap.get(name).dir, target, packageMap.get(name).pkg, skippedSymlinks, partial);
+      }
+    }
+
+    if (loader === 'none') {
+      for (const target of exportTargets(materializePublishManifest(serverPackage).exports)) {
+        if (typeof target !== 'string') continue;
+        if (TS_EXTENSIONS.test(target)) throw new Error(`TypeScript export target for ${serverPackage.name}: ${target}`);
+        if (!target.startsWith('./')) continue;
+        if (target.includes('*')) continue;
+        const stat = await lstatOrNull(path.join(partial, 'app/server', target.slice(2)));
+        if (!stat?.isFile() || stat.isSymbolicLink()) throw new Error(`Missing export target for ${serverPackage.name}: ${target}`);
+      }
     }
 
     await fs.mkdir(path.join(partial, 'sidecar'), { recursive: true });
-    await copyTree(path.join(sidecar, 'entry.mjs'), path.join(partial, 'sidecar', 'entry.mjs'), { skippedSymlinks, stageRoot: partial });
+    for (const name of ['entry.mjs', 'db-template-seed.mjs']) {
+      await copyTree(path.join(sidecar, name), path.join(partial, 'sidecar', name), { skippedSymlinks, stageRoot: partial });
+    }
     if (nodeDir) {
       await fs.mkdir(path.join(partial, 'runtime'), { recursive: true });
       await copyTree(path.join(nodeDir, nodeName), path.join(partial, 'runtime', nodeName), { skippedSymlinks, stageRoot: partial });
@@ -386,6 +494,7 @@ export async function stageServer(options = {}) {
     const preManifestMetrics = await pathMetrics(partial);
     const manifest = {
       schemaVersion: 1,
+      loader,
       platform,
       ...(options.now !== undefined ? { generatedAt: options.now } : {}),
       counts: { files: 0, directories: 0, bytes: 0 },
@@ -402,6 +511,7 @@ export async function stageServer(options = {}) {
       entries: (await fs.readdir(partial)).sort(compareStrings).concat('stage-manifest.json').sort(compareStrings),
     };
     await writeManifest(partial, manifest);
+    if (loader === 'none') verifyWorkspaceResolution(partial);
     const verified = await verifyStage(partial, {
       maxPathBudget: limit, installPrefixLength, requireRuntime: options.requireRuntime,
     });
@@ -447,7 +557,7 @@ export async function verifyStage(outDirValue, options = {}) {
   for (const [relative, label] of [
     ['app/server/dist/index.js', 'server entry'],
     ['sidecar/entry.mjs', 'sidecar entry'],
-    ['app/node_modules/tsx/dist/loader.mjs', 'tsx loader'],
+    ['sidecar/db-template-seed.mjs', 'sidecar database-template seed module'],
   ]) {
     const stat = await lstatOrNull(path.join(outDir, relative));
     if (!stat?.isFile() || stat.isSymbolicLink()) problems.push(`Missing ${label}: ${relative}`);
@@ -459,6 +569,11 @@ export async function verifyStage(outDirValue, options = {}) {
     try { manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')); }
     catch (error) { problems.push(`Invalid stage manifest: ${error.message}`); }
   } else problems.push('Missing stage-manifest.json');
+  if (manifest?.loader !== undefined && !['none', 'tsx'].includes(manifest.loader)) problems.push(`Invalid stage loader: ${manifest.loader}`);
+  if (manifest?.loader === 'tsx') {
+    const loaderStat = await lstatOrNull(path.join(outDir, 'app/node_modules/tsx/dist/loader.mjs'));
+    if (!loaderStat?.isFile() || loaderStat.isSymbolicLink()) problems.push('Missing tsx loader: app/node_modules/tsx/dist/loader.mjs');
+  }
   for (const name of manifest?.closure ?? []) {
     try { validateWorkspaceName(name); }
     catch { problems.push(`Invalid workspace package name in manifest: ${String(name)}`); continue; }
@@ -500,7 +615,7 @@ function parseArgs(argv) {
     }
     if (!key.startsWith('--') || i + 1 >= argv.length) throw new Error(`Invalid argument: ${key}`);
     const value = argv[++i];
-    const optionName = ({ '--repo': 'repo', '--prod-modules': 'prodModules', '--out': 'out', '--node-dir': 'nodeDir', '--sidecar': 'sidecar', '--platform': 'platform', '--max-path-budget': 'maxPathBudget', '--install-prefix-length': 'installPrefixLength' })[key];
+    const optionName = ({ '--repo': 'repo', '--prod-modules': 'prodModules', '--out': 'out', '--node-dir': 'nodeDir', '--sidecar': 'sidecar', '--platform': 'platform', '--loader': 'loader', '--max-path-budget': 'maxPathBudget', '--install-prefix-length': 'installPrefixLength' })[key];
     if (!optionName) throw new Error(`Unknown option: ${key}`);
     options[optionName] = ['maxPathBudget', 'installPrefixLength'].includes(optionName) ? Number(value) : value;
   }

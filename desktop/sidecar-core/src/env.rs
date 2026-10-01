@@ -57,6 +57,14 @@ pub fn build_environment(config: &SidecarConfig, nonce: &str) -> Vec<(String, St
     set("PAPERCLIP_DISABLE_CWD_ENV_FILE", "true".into());
     set("PAPERCLIP_OPEN_ON_LISTEN", "false".into());
     set("CREWSPAN_SIDECAR_NONCE", nonce.into());
+    set(
+        "CREWSPAN_SIDECAR_DB_TEMPLATE",
+        config
+            .db_template
+            .as_ref()
+            .map(|path| path.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "off".into()),
+    );
     if let Some(path) = &config.server_entry {
         set(
             "CREWSPAN_SIDECAR_SERVER_ENTRY",

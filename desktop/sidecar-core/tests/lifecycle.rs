@@ -1,5 +1,13 @@
-use crewspan_sidecar_core::{Sidecar, SidecarConfig, SidecarError, StopOutcome};
-use std::{net::TcpListener, path::PathBuf, process::Command, time::Duration};
+use crewspan_sidecar_core::{
+    Sidecar, SidecarConfig, SidecarError, StartupPhase, StartupProgress, StopOutcome,
+};
+use std::{
+    net::TcpListener,
+    path::PathBuf,
+    process::Command,
+    sync::{atomic::AtomicBool, Arc},
+    time::Duration,
+};
 use tempfile::TempDir;
 
 fn node() -> Option<PathBuf> {
@@ -30,7 +38,7 @@ fn setup(
     std::fs::write(&loader, "export {};\n").unwrap();
     let mut c = SidecarConfig::new(
         node,
-        loader,
+        Some(loader),
         entry,
         dir.path().to_owned(),
         dir.path().join("home"),
@@ -60,6 +68,14 @@ let requests = 0;
 const nonce = process.env.CREWSPAN_SIDECAR_NONCE;
 const port = Number(process.env.PORT);
 const mode = process.env.FAKE_MODE || '';
+if (mode === 'phases') {
+  console.log('CREWSPAN_SIDECAR_PHASE {"phase":"seed_database","elapsedMs":0}');
+  console.log('CREWSPAN_SIDECAR_PHASE {"phase":"load_server","elapsedMs":1}');
+  console.log('CREWSPAN_SIDECAR_PHASE {"phase":"start_server","elapsedMs":2}');
+  console.log(JSON.stringify({level:30,msg:'Applying 2 pending migrations for Embedded PostgreSQL'}));
+  console.log(JSON.stringify({level:30,msg:'Embedded PostgreSQL ready'}));
+  console.log(JSON.stringify({level:30,msg:'Server startup recovery complete on 127.0.0.1:3100'}));
+}
 if (mode === 'error') { console.error('CREWSPAN_SIDECAR_ERROR {"code":"invalid_env","message":"fake detail"}'); process.exit(65); }
 if (mode === 'empty-exit') process.exit(2);
 if (mode === 'verbose') setInterval(() => { for (let i = 0; i < 100; i++) console.log('verbose sidecar output'); }, 10);
@@ -87,6 +103,73 @@ fn happy_path_health_logs_and_idempotent_stop() {
     assert_eq!(sidecar.stop(), StopOutcome::Graceful);
     assert_eq!(sidecar.stop(), StopOutcome::AlreadyStopped);
     assert!(!sidecar.is_running());
+}
+
+#[test]
+fn starts_without_the_optional_tsx_loader() {
+    let Some((_dir, mut config)) =
+        setup("", "ok", 0, Duration::from_secs(4), Duration::from_secs(2))
+    else {
+        return;
+    };
+    config.tsx_loader = None;
+    let mut sidecar = Sidecar::start(config).unwrap();
+    assert_eq!(sidecar.stop(), StopOutcome::Graceful);
+}
+
+#[test]
+fn startup_cancellation_interrupts_ready_and_health_waits() {
+    for (mode, status) in [("no-ready", "ok"), ("", "starting")] {
+        let Some((_dir, config)) = setup(
+            mode,
+            status,
+            0,
+            Duration::from_secs(10),
+            Duration::from_secs(1),
+        ) else {
+            return;
+        };
+        let cancel = Arc::new(AtomicBool::new(false));
+        let cancel_after_delay = Arc::clone(&cancel);
+        let canceller = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(250));
+            cancel_after_delay.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+        let result = Sidecar::start_cancellable(config, &cancel, &mut |_| {});
+        canceller.join().unwrap();
+        assert!(matches!(result, Err(SidecarError::Cancelled)));
+    }
+}
+
+#[test]
+fn phase_markers_reach_the_progress_callback_in_monotonic_order() {
+    let Some((_dir, config)) = setup(
+        "phases",
+        "ok",
+        0,
+        Duration::from_secs(4),
+        Duration::from_secs(2),
+    ) else {
+        return;
+    };
+    let mut progress: Vec<StartupProgress> = Vec::new();
+    let mut sidecar =
+        Sidecar::start_with_progress(config, &mut |event| progress.push(event)).unwrap();
+    let phases: Vec<StartupPhase> = progress.iter().map(|event| event.phase).collect();
+    assert_eq!(
+        phases,
+        vec![
+            StartupPhase::Launching,
+            StartupPhase::PreparingDatabase,
+            StartupPhase::ApplyingUpdates,
+            StartupPhase::StartingServer,
+            StartupPhase::Loading,
+        ]
+    );
+    assert!(progress
+        .windows(2)
+        .all(|pair| pair[0].elapsed <= pair[1].elapsed));
+    assert_eq!(sidecar.stop(), StopOutcome::Graceful);
 }
 #[test]
 fn health_starting_then_ok() {
