@@ -47,6 +47,18 @@ jobs:
         with:
           path: repo
 
+      - name: Check updater signing key (fail fast)
+        shell: pwsh
+        working-directory: repo
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          # Fails in about a minute if the key or password secrets are wrong, instead of after the 45 minute build.
+          Set-Content -Path "$env:RUNNER_TEMP/sign-probe.txt" -Value "probe"
+          npx --yes @tauri-apps/cli@2 signer sign "$env:RUNNER_TEMP/sign-probe.txt"
+          if ($LASTEXITCODE -ne 0) { throw "Updater signing key check failed. Re-save TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD." }
+
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 9.15.4
