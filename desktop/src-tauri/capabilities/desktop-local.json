@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/capabilities.json",
+  "identifier": "desktop-local",
+  "description": "Native APIs for Crewspan's bundled splash page only.",
+  "local": true,
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "opener:allow-open-url"
+  ]
+}

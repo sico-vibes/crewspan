@@ -88,3 +88,6 @@ test-results/
 .lifecycle-baseline/
 desktop/stage/
 desktop/target/
+
+# Tauri generated schemas
+/desktop/src-tauri/gen/
