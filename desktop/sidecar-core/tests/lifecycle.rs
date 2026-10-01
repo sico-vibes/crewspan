@@ -46,6 +46,12 @@ fn setup(
         ("FAKE_STATUS".into(), status.into()),
         ("FAKE_STARTING".into(), starting.to_string()),
     ];
+    // Node on Windows aborts at startup (CSPRNG assertion) without SystemRoot.
+    for (name, value) in std::env::vars() {
+        if matches!(name.to_ascii_uppercase().as_str(), "SYSTEMROOT" | "WINDIR") {
+            c.inherited_env.push((name, value));
+        }
+    }
     Some((dir, c))
 }
 const FAKE: &str = r#"
