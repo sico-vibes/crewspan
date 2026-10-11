@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "slug": "opencode-go",
   "name": "OpenCode Go",
-  "description": "Connect an OpenCode Go account for OpenCode agents.",
+  "description": "Connect OpenCode Go accounts for your agents.",
   "categories": [
     "ai"
   ],
@@ -31,7 +31,7 @@
       "ownershipModes": [
         "customer"
       ],
-      "whenToUse": "Authenticate an OpenCode agent with this account.",
+      "whenToUse": "Authenticate an agent with this account.",
       "guidanceMd": "Use your personal account or an explicitly shared company account.",
       "riskTier": "S3",
       "credentialFields": [
@@ -49,5 +49,8 @@
         "name": "OPENCODE_API_KEY"
       }
     }
+  ],
+  "tags": [
+    "model-provider"
   ]
 }
