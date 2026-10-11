@@ -13,6 +13,7 @@ import { resolveDefaultAgentWorkspaceDir } from "../../home-paths.js";
 import {
   createHeartbeatWorkspaceResolver,
   ensureManagedProjectWorkspace,
+  isGitNotRepositoryMessage,
   WorkspaceValidationFailure,
 } from "./workspaces.js";
 
@@ -177,5 +178,27 @@ describe("heartbeat workspace module", () => {
     const result = await legacyEnsureManagedProjectWorkspace(input);
     expect(resolveGitAuth).toHaveBeenCalledTimes(2);
     expect(await fs.readFile(path.join(result.cwd, "README.md"), "utf8")).toBe("retry succeeded\n");
+  });
+});
+
+describe("isGitNotRepositoryMessage", () => {
+  it("accepts Git's parent-directory and filesystem-boundary forms", () => {
+    expect(isGitNotRepositoryMessage("fatal: not a git repository (or any of the parent directories): .git\n")).toBe(true);
+    expect(isGitNotRepositoryMessage(
+      "fatal: not a git repository (or any parent up to mount point /)\n" +
+        "Stopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).\n",
+    )).toBe(true);
+    expect(isGitNotRepositoryMessage(
+      "fatal: not a git repository (or any parent up to mount point /home)\r\n" +
+        "Stopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).",
+    )).toBe(true);
+  });
+
+  it("rejects other Git failures", () => {
+    expect(isGitNotRepositoryMessage("fatal: not a git repository: '/repo/.git'\n")).toBe(false);
+    expect(isGitNotRepositoryMessage("fatal: detected dubious ownership in repository at '/repo'\n")).toBe(false);
+    expect(isGitNotRepositoryMessage(
+      "fatal: not a git repository (or any parent up to mount point /)\nsomething else\n",
+    )).toBe(false);
   });
 });

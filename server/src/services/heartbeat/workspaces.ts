@@ -944,6 +944,15 @@ async function isGitCheckout(cwd: string | null | undefined) {
     .catch(() => false);
 }
 
+/**
+ * Git's exact "not a repository" stderr (LC_ALL=C). When discovery stops at a
+ * filesystem boundary, such as a tmpfs /tmp or a btrfs subvolume home, Git
+ * names the mount point instead of "any of the parent directories".
+ */
+export function isGitNotRepositoryMessage(stderr: string): boolean {
+  return /^fatal: not a git repository \((?:or any of the parent directories\): \.git|or any parent up to mount point [^\r\n]*\)\r?\nStopping at filesystem boundary \(GIT_DISCOVERY_ACROSS_FILESYSTEM not set\)\.)\r?\n?$/.test(stderr);
+}
+
 async function probeGitWorktreeBase(cwd: string) {
   try {
     const result = await execFile("git", ["rev-parse", "--show-toplevel"], {
@@ -958,7 +967,7 @@ async function probeGitWorktreeBase(cwd: string) {
     // corruption and I/O failures must remain reportable in Sentry.
     const notRepository = failure.code === 128 && failure.signal == null &&
       typeof failure.stderr === "string" &&
-      /^fatal: not a git repository \(or any of the parent directories\): \.git\r?\n?$/.test(failure.stderr) &&
+      isGitNotRepositoryMessage(failure.stderr) &&
       !process.env.GIT_DIR && !process.env.GIT_WORK_TREE && !process.env.GIT_COMMON_DIR &&
       await hasNoGitMetadataInWorkspaceAncestors(cwd);
     return { isCheckout: false, notRepository };
