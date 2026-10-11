@@ -1,0 +1,204 @@
+#!/usr/bin/env bash
+# crewspan — start, stop and open the local Crewspan server on Linux.
+#
+# The server runs as the systemd user unit crewspan.service (written by
+# install-crewspan-app.sh), serving the built server + SPA on 127.0.0.1:3100.
+# Run with no arguments for the interactive panel, or use a subcommand:
+#
+#   crewspan            panel: starts the server if needed, opens the app
+#   crewspan start      build if the checkout changed, then start
+#   crewspan stop       stop the server
+#   crewspan restart    restart the server
+#   crewspan status     print server status
+#   crewspan open       open Crewspan in a browser app window
+#   crewspan logs       follow server logs (Ctrl+C to leave)
+#   crewspan build      install dependencies and build the checkout
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../.." && pwd)"
+UNIT="crewspan.service"
+URL="http://127.0.0.1:3100"
+HEALTH_URL="$URL/api/health"
+PAPERCLIP_HOME="${PAPERCLIP_HOME:-$HOME/.paperclip}"
+INSTANCE_CONFIG="$PAPERCLIP_HOME/instances/default/config.json"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/crewspan"
+BUILD_STAMP="$STATE_DIR/built-commit"
+
+# App launchers do not source the interactive shell, so mise-managed node,
+# pnpm and cargo may be missing from PATH.
+for dir in "$HOME/.local/share/mise/shims" "$HOME/.cargo/bin" "$HOME/.local/bin"; do
+  [[ -d $dir && :$PATH: != *:$dir:* ]] && PATH="$dir:$PATH"
+done
+export PATH
+
+has_gum() { [[ -t 1 ]] && command -v gum >/dev/null; }
+say() { if has_gum; then gum log --level info "$*"; else echo "$*"; fi; }
+fail() { if has_gum; then gum log --level error "$*"; else echo "error: $*" >&2; fi; return 1; }
+
+healthy() { curl -sf --max-time 2 "$HEALTH_URL" >/dev/null 2>&1; }
+wait_healthy() {
+  local i
+  for i in $(seq 1 60); do
+    healthy && return 0
+    # Give up early once the unit has failed or stopped.
+    case $(systemctl --user show -p ActiveState --value "$UNIT" 2>/dev/null) in
+      active|activating|reloading|"") ;;
+      *) return 1 ;;
+    esac
+    sleep 2
+  done
+  return 1
+}
+active() { systemctl --user is-active --quiet "$UNIT"; }
+head_commit() { git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown; }
+built_commit() { cat "$BUILD_STAMP" 2>/dev/null || echo none; }
+
+needs_build() {
+  [[ ! -f $ROOT/server/dist/index.js || ! -f $ROOT/ui/dist/index.html ]] && return 0
+  local built
+  built="$(built_commit)"
+  [[ $built == "$(head_commit)" ]] && return 1
+  # Commits that touch only docs or this launcher do not need a rebuild.
+  [[ $built != none ]] && git -C "$ROOT" diff --quiet "$built" HEAD -- . \
+    ':(exclude)doc' ':(exclude)docs' ':(exclude)*.md' ':(exclude)scripts/linux' 2>/dev/null && return 1
+  return 0
+}
+
+# Run a long command behind a spinner when interactive; show its log on failure.
+run_step() {
+  local title="$1"; shift
+  local log
+  log="$(mktemp)"
+  if has_gum; then
+    if gum spin --spinner dot --title "$title" -- bash -c '"$@" >"$0" 2>&1' "$log" "$@"; then rm -f "$log"; return 0; fi
+  else
+    echo "$title"
+    if "$@" >"$log" 2>&1; then rm -f "$log"; return 0; fi
+  fi
+  tail -n 40 "$log" >&2
+  echo "Full log: $log" >&2
+  return 1
+}
+
+cmd_build() {
+  mkdir -p "$STATE_DIR"
+  run_step "Installing dependencies…" bash -c "cd '$ROOT' && pnpm install --frozen-lockfile" || fail "Dependency install failed." || return 1
+  run_step "Building Crewspan (this takes a few minutes)…" bash -c "cd '$ROOT' && pnpm build" || fail "Build failed." || return 1
+  head_commit >"$BUILD_STAMP"
+  say "Built $(head_commit | cut -c1-9)."
+}
+
+ensure_ready_to_start() {
+  systemctl --user cat "$UNIT" >/dev/null 2>&1 \
+    || fail "crewspan.service is not installed. Run $ROOT/scripts/linux/install-crewspan-app.sh" || return 1
+  [[ -f $INSTANCE_CONFIG ]] \
+    || fail "No Crewspan instance at $INSTANCE_CONFIG. Run once: cd $ROOT && pnpm paperclipai onboard --yes --bind loopback" || return 1
+  if needs_build; then
+    say "Checkout is at $(head_commit | cut -c1-9); last build was $(built_commit | cut -c1-9). Rebuilding."
+    cmd_build
+  fi
+}
+
+cmd_start() {
+  if active && healthy; then say "Crewspan is already running at $URL"; return 0; fi
+  ensure_ready_to_start
+  # Type=notify: systemctl returns once the server reports it is ready. Its
+  # exit status alone is not trusted (a systemd re-exec drops the client), so
+  # the health check decides.
+  run_step "Starting Crewspan…" systemctl --user start "$UNIT" || true
+  wait_healthy || fail "Crewspan did not become healthy. See: crewspan logs" || return 1
+  say "Crewspan is running at $URL"
+}
+
+cmd_stop() {
+  active || { say "Crewspan is not running."; return 0; }
+  run_step "Stopping Crewspan…" systemctl --user stop "$UNIT"
+  say "Crewspan stopped."
+}
+
+cmd_restart() {
+  ensure_ready_to_start
+  run_step "Restarting Crewspan…" systemctl --user restart "$UNIT" || true
+  wait_healthy || fail "Crewspan did not become healthy. See: crewspan logs" || return 1
+  say "Crewspan is running at $URL"
+}
+
+cmd_open() {
+  if command -v omarchy-launch-webapp >/dev/null; then
+    omarchy-launch-webapp "$URL" >/dev/null 2>&1 &
+  else
+    xdg-open "$URL" >/dev/null 2>&1 &
+  fi
+  disown 2>/dev/null || true
+}
+
+cmd_logs() {
+  # Ctrl+C ends the log view without ending the panel.
+  trap 'true' INT
+  journalctl --user -u "$UNIT" -n 200 -f -o cat || true
+  trap - INT
+}
+
+cmd_status() {
+  local state="stopped"
+  if active; then state=$(healthy && echo "running" || echo "starting"); fi
+  echo "Crewspan: $state"
+  echo "URL:      $URL"
+  echo "Checkout: $ROOT ($(git -C "$ROOT" branch --show-current 2>/dev/null) @ $(head_commit | cut -c1-9))"
+  echo "Built:    $(built_commit | cut -c1-9)"
+  echo "Instance: $INSTANCE_CONFIG"
+}
+
+panel_header() {
+  local dot="○ stopped" color=244
+  if active; then
+    if healthy; then dot="● running"; color=10; else dot="◐ starting"; color=11; fi
+  fi
+  local stale=""
+  needs_build && stale="  (checkout changed — rebuild pending)"
+  clear
+  gum style --border rounded --padding "0 2" --border-foreground 212 \
+    "$(gum style --bold 'Crewspan')" \
+    "$(gum style --foreground "$color" "$dot")  $URL" \
+    "$(gum style --faint "$(git -C "$ROOT" branch --show-current 2>/dev/null) @ $(head_commit | cut -c1-9)$stale")"
+}
+
+cmd_panel() {
+  if ! has_gum; then cmd_start && cmd_open; return; fi
+  if ! (active && healthy); then cmd_start || { gum confirm "Start failed. View logs?" && cmd_logs; }; fi
+  (active && healthy) && cmd_open
+
+  local choice
+  while true; do
+    panel_header
+    if active; then
+      choice=$(gum choose --header "" "Open Crewspan" "View logs" "Restart" "Rebuild and restart" "Stop server" "Quit (server keeps running)") || break
+    else
+      choice=$(gum choose --header "" "Start server" "Rebuild and start" "View logs" "Quit") || break
+    fi
+    case $choice in
+      "Open Crewspan") cmd_open ;;
+      "View logs") cmd_logs ;;
+      "Restart") cmd_restart || gum input --placeholder "Press Enter to continue" >/dev/null || true ;;
+      "Rebuild and restart"|"Rebuild and start")
+        { cmd_build && cmd_restart && cmd_open; } || gum input --placeholder "Press Enter to continue" >/dev/null || true ;;
+      "Start server") { cmd_start && cmd_open; } || gum input --placeholder "Press Enter to continue" >/dev/null || true ;;
+      "Stop server") cmd_stop ;;
+      Quit*) break ;;
+    esac
+  done
+}
+
+case "${1:-panel}" in
+  panel) cmd_panel ;;
+  start) cmd_start ;;
+  stop) cmd_stop ;;
+  restart) cmd_restart ;;
+  status) cmd_status ;;
+  open) cmd_open ;;
+  logs) cmd_logs ;;
+  build) cmd_build ;;
+  -h|--help|help) sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
+  *) echo "Unknown command: $1 (see: crewspan help)" >&2; exit 2 ;;
+esac

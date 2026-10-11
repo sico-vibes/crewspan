@@ -24,6 +24,7 @@ Read, in this order: `AGENTS.md` → `doc/plans/2026-09-30-m1-handoff.md` → `d
    - production — `.\Start-Default.ps1 -Mode production`, which runs the container's own command:
      `node --import ./server/node_modules/tsx/dist/loader.mjs server/dist/index.js`
 5. Verify: `GET http://127.0.0.1:3100/api/health` → 200, `status=ok`.
+6. Linux (Omarchy): `scripts/linux/install-crewspan-app.sh` installs the `crewspan` command, a systemd user service for the built server, and an app-launcher entry — see `scripts/linux/README.md`. The build also needs Rust (`cargo`) for the runner binary.
 
 **Windows specifics already fixed — do not regress:** cross-platform asset copying in `packages/db` and `server`; `pathToFileURL()` before dynamic `import()` in the Storybook scripts; CRLF→LF normalisation in generated checks; workspace links as **junctions** (symlinks fail without Developer Mode).
 
