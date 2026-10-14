@@ -173,3 +173,24 @@ describe.skipIf(process.platform === "win32")("local browser subscription login"
     expect(login.authorizationUrl).toBeUndefined();
   });
 });
+
+describe.skipIf(process.platform !== "win32")("local browser subscription login on Windows", () => {
+  it("surfaces a Codex device link and code through the Windows console", async () => {
+    root ??= await mkdtemp(path.join(os.tmpdir(), "paperclip-browser-login-"));
+    const home = path.join(root, "credential-home");
+    await mkdir(home, { recursive: true });
+    const command = path.join(root, "codex.cmd");
+    await writeFile(command, [
+      "@echo off",
+      "echo 1. Open this link in your browser and sign in to your account",
+      "echo https://auth.openai.com/codex/device",
+      "echo 2. Enter this one-time code (expires in 15 minutes)",
+      "echo ABCD-EFGHJ",
+    ].join("\r\n"));
+    vi.mocked(resolveCodexCommand).mockReturnValue(command);
+    const login = startLocalBrowserLogin("openai", home);
+    await vi.waitFor(() => expect(login.outcome).toBe("success"), { timeout: 20000 });
+    expect(login.authorizationUrl).toBe("https://auth.openai.com/codex/device");
+    expect(login.code).toBe("ABCD-EFGHJ");
+  }, 20000);
+});

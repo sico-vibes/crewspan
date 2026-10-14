@@ -99,6 +99,8 @@ interface SpawnTarget {
   cwd?: string;
   env?: Record<string, string | undefined>;
   cleanup?: () => Promise<void>;
+  // cmd.exe quoting is already applied. Node must not escape it again.
+  windowsVerbatimArguments?: boolean;
 }
 
 type RemoteExecutionSpec = SshRemoteExecutionSpec;
@@ -3696,9 +3698,14 @@ async function resolveSpawnTarget(
       quoteForCmd(executable),
       ...args.map(quoteForCmd),
     ].join(" ");
+    // Node rewrites inner quotes as \", which cmd.exe /s /c cannot parse.
+    // An extra outer pair is stripped by /s, leaving the cmd-quoted command.
+    // A profile path with a space, such as C:\Users\First Last\...\codex.CMD,
+    // otherwise becomes a command name that includes the quote characters.
     return {
       command: shell,
-      args: ["/d", "/s", "/c", commandLine],
+      args: ["/d", "/s", "/c", `"${commandLine}"`],
+      windowsVerbatimArguments: true,
     };
   }
 
@@ -4755,6 +4762,7 @@ export async function runChildProcess(
           env: childEnv,
           detached: process.platform !== "win32",
           shell: false,
+          windowsVerbatimArguments: target.windowsVerbatimArguments,
           stdio: [opts.stdin != null ? "pipe" : "ignore", "pipe", "pipe"],
         }) as ChildProcessWithEvents;
         const startedAt = new Date().toISOString();

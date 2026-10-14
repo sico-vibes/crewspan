@@ -101,7 +101,14 @@ async function ensureWorkspaceLinksCurrent(workspaceDir: string) {
     const linkPath = path.join(repoRoot, mismatch.workspaceDir, "node_modules", ...mismatch.packageName.split("/"));
     await fs.mkdir(path.dirname(linkPath), { recursive: true });
     await fs.rm(linkPath, { recursive: true, force: true });
-    await fs.symlink(mismatch.expectedPath, linkPath);
+    try {
+      await fs.symlink(mismatch.expectedPath, linkPath, "dir");
+    } catch (error) {
+      // Windows without Developer Mode rejects symlinks. A junction does not.
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "EPERM" || process.platform !== "win32") throw error;
+      await fs.symlink(mismatch.expectedPath, linkPath, "junction");
+    }
   }
 
   const remainingMismatches = findWorkspaceLinkMismatches(workspaceDir);
