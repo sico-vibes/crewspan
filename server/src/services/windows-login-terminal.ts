@@ -128,7 +128,7 @@ sys.exit(os.waitstatus_to_exitcode(status))
     return spawn("python3", ["-u", "-c", bridge, executable, ...args], { env, stdio: ["pipe", "pipe", "pipe"] });
   }
   const pathValue = mergedWindowsPath(env.PATH ?? env.Path);
-  const childEnv = { ...env, PATH: pathValue, Path: pathValue };
+  const childEnv: NodeJS.ProcessEnv = { ...env, PATH: pathValue, Path: pathValue };
   const resolved = resolveWindowsExecutable(executable, childEnv);
   if (resolved && path.win32.basename(resolved).toLowerCase() === "claude.exe") delete childEnv.BROWSER;
   if (!resolved) {
