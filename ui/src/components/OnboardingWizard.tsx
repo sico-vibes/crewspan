@@ -1023,7 +1023,7 @@ function OnboardingWizardInner({
     ownership: "personal", agentIds: [], allAgents: true,
   }, effectiveOnboardingOpen && step === 4 && canUseLocalLogin && credentialMode !== "api" &&
     Boolean(managedProvider) && !savedSubscription && !savedKeys.storedLogin.data && !managedBindingForStep(),
-  );
+  { allowHostClaude: localLoginHealth.data?.deploymentMode === "local_trusted" });
   // A result from a previous selection must not hire or advance this wizard.
   // Environment query updates are not user navigation: the test resolves its
   // own environment, and those updates must not interrupt the pending attempt.

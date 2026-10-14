@@ -1,7 +1,7 @@
 import { readLocalAiCredentialFile } from "./local-ai-credential-file.js";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { readIsolatedClaudeKeychainToken } from "@paperclipai/adapter-claude-local/server";
+import { readClaudeToken, readIsolatedClaudeKeychainToken } from "@paperclipai/adapter-claude-local/server";
 import { readCodexAuthInfo, fetchCodexQuota } from "@paperclipai/adapter-codex-local/server";
 import { parseGrokAuthPayload, hasUsableGrokAuthValue } from "@paperclipai/adapter-grok-local/server";
 import type { AiProvider } from "@paperclipai/shared";
@@ -11,7 +11,9 @@ import { unprocessable } from "../errors.js";
 export async function readVerifiedLocalAiCredential(provider: AiProvider, loginHome?: string): Promise<string> {
   if (provider === "openrouter") throw unprocessable("OpenRouter requires an API key.");
   if (provider === "opencode-go") throw unprocessable("OpenCode Go requires an API key.");
-  if (!loginHome) throw unprocessable(provider === "xai"
+  // Anthropic may read the login already present on the operator's machine;
+  // every other provider needs a connection-specific login home.
+  if (provider !== "anthropic" && !loginHome) throw unprocessable(provider === "xai"
     ? "Start local sign-in for this connection before connecting."
     : "Start browser sign-in for this connection before connecting.");
   try {
@@ -19,18 +21,24 @@ export async function readVerifiedLocalAiCredential(provider: AiProvider, loginH
       // Never change process.env or fall back to the server account when an
       // authenticated user's isolated login is missing or invalid.
       let token: string | null = null;
-      for (const name of [".credentials.json", "credentials.json"]) {
-        const raw = await readLocalAiCredentialFile(path.join(loginHome, name)).catch(() => null);
-        if (!raw) continue;
-        let parsed;
-        try { parsed = JSON.parse(raw); } catch { continue; }
-        const value = parsed?.claudeAiOauth?.accessToken;
-        if (typeof value === "string" && value.length) { token = value; break; }
+      if (loginHome) {
+        for (const name of [".credentials.json", "credentials.json"]) {
+          const raw = await readLocalAiCredentialFile(path.join(loginHome, name)).catch(() => null);
+          if (!raw) continue;
+          let parsed;
+          try { parsed = JSON.parse(raw); } catch { continue; }
+          const value = parsed?.claudeAiOauth?.accessToken;
+          if (typeof value === "string" && value.length) { token = value; break; }
+        }
+        // On macOS the CLI stores the isolated login in the auth home's own
+        // suffixed Keychain item rather than a credentials file. The helper
+        // never consults the unsuffixed operator item.
+        if (!token) token = await readIsolatedClaudeKeychainToken(loginHome);
+      } else {
+        // The local operator authorized this machine's own Claude CLI. Read that
+        // login directly instead of forcing a fresh server-side browser sign-in.
+        token = await readClaudeToken({ allowKeychain: true });
       }
-      // On macOS the CLI stores the isolated login in the auth home's own
-      // suffixed Keychain item rather than a credentials file. The helper
-      // never consults the unsuffixed operator item.
-      if (!token) token = await readIsolatedClaudeKeychainToken(loginHome);
       if (!token) throw new Error("Missing login");
       // Claude's setup-token OAuth flow requests user:inference. The usage API
       // requires user:profile and returns 403 for that valid token, so it cannot
@@ -56,8 +64,10 @@ export async function readVerifiedLocalAiCredential(provider: AiProvider, loginH
     return raw;
   } catch {
     // Provider/CLI errors may contain credential material; never return them.
-    throw unprocessable(provider === "xai"
-      ? "Could not verify the local subscription. Run the sign-in command shown for this connection, finish signing in, then try Connect again."
-      : "Could not verify the local subscription. Finish browser sign-in for this connection, then try Connect again.");
+    throw unprocessable(provider === "anthropic" && !loginHome
+      ? "Could not verify the local subscription. Run claude auth login in a terminal on the machine running Paperclip, then try Connect again."
+      : provider === "xai"
+        ? "Could not verify the local subscription. Run the sign-in command shown for this connection, finish signing in, then try Connect again."
+        : "Could not verify the local subscription. Finish browser sign-in for this connection, then try Connect again.");
   }
 }

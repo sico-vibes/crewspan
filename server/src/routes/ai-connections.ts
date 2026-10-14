@@ -32,6 +32,7 @@ import { accessService } from "../services/access.js";
 import { logActivity } from "../services/activity-log.js";
 import { aiConnectionRouterService } from "../services/ai-connection-router.js";
 import { aiConnectionService } from "../services/ai-connections.js";
+import { readVerifiedLocalAiCredential } from "../services/local-ai-credentials.js";
 import { validate } from "../middleware/validate.js";
 
 /** Agent API calls inherit authenticated run identity, never the agent's own ID. */
@@ -324,11 +325,20 @@ export function aiConnectionRoutes(db: Db, options: Parameters<typeof supportsLo
       const companyId = req.params.companyId as string;
       const { localSessionId, ...input } = localAiConnectionSchema.parse(req.body);
       assertLocalLoginAvailable();
+      if (input.provider === "anthropic" && !localSessionId) assertLocalOperator(req);
       const userId = await assertAiConnectionCreateAccess(db, req, companyId, input);
-      if (!localSessionId) throw unprocessable(input.provider === "xai"
-        ? "Start local sign-in for this connection before connecting."
-        : "Start browser sign-in for this connection before connecting.");
-      res.status(201).json(await localLogin.complete(companyId, userId, localSessionId, input));
+      if (localSessionId || input.provider === "openai" || input.provider === "xai") {
+        if (!localSessionId) throw unprocessable(input.provider === "xai"
+          ? "Start local sign-in for this connection before connecting."
+          : "Start browser sign-in for this connection before connecting.");
+        res.status(201).json(await localLogin.complete(companyId, userId, localSessionId, input));
+        return;
+      }
+      // Anthropic on a local-trusted instance may connect the machine's own
+      // Claude CLI login directly, with no separate sign-in attempt.
+      const attemptStartedAt = new Date();
+      const credential = await readVerifiedLocalAiCredential(input.provider);
+      res.status(201).json(await service.save(companyId, userId, input, credential, undefined, attemptStartedAt));
     },
   );
   router.put(

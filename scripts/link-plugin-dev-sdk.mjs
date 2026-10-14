@@ -78,7 +78,8 @@ export function linkSdkInto(packageDir) {
   try {
     const stat = lstatSync(linkTarget);
     if (stat.isSymbolicLink()) {
-      if (readlinkSync(linkTarget) === relativeSdkDir) {
+      const current = resolve(scopeDir, readlinkSync(linkTarget));
+      if (current === resolve(sdkDir)) {
         // Already linked to the in-repo SDK; nothing to do.
         return false;
       }
@@ -93,6 +94,12 @@ export function linkSdkInto(packageDir) {
     if (error?.code !== "ENOENT") throw error;
   }
 
-  symlinkSync(relativeSdkDir, linkTarget, "dir");
+  try {
+    symlinkSync(relativeSdkDir, linkTarget, "dir");
+  } catch (error) {
+    // Windows without Developer Mode rejects symlinks. A junction does not.
+    if (error?.code !== "EPERM" || process.platform !== "win32") throw error;
+    symlinkSync(sdkDir, linkTarget, "junction");
+  }
   return true;
 }

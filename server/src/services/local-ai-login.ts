@@ -147,7 +147,9 @@ export function localAiLoginService(db: Db) {
   // login. Scope and intent are checked before touching an attempt's directory.
   async function check(companyId: string, userId: string, intent: AiConnectionLoginIntent, id?: string): Promise<LocalAiLoginStatus> {
     let directory: string | undefined;
-    {
+    // Anthropic may use the login already on the operator's machine, so it needs
+    // no open attempt. Every other provider must have an attempt to check.
+    if (id || intent.provider !== "anthropic") {
       if (!id) throw unprocessable(intent.provider === "xai"
         ? "Start local sign-in before checking this account."
         : "Start browser sign-in before checking this account.");
