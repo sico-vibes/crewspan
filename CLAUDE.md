@@ -28,6 +28,8 @@ Read, in this order: `AGENTS.md` → `doc/plans/2026-09-30-m1-handoff.md` → `d
 
 **Windows specifics already fixed — do not regress:** cross-platform asset copying in `packages/db` and `server`; `pathToFileURL()` before dynamic `import()` in the Storybook scripts; CRLF→LF normalisation in generated checks; workspace links as **junctions** (symlinks fail without Developer Mode).
 
+**Claude local sign-in — do not regress:** on a `local_trusted` instance, connecting Anthropic adopts the **machine's existing Claude CLI login** (the `allowHostClaude` path). Never force a fresh server-side browser sign-in there. Invariants, verification and the failing-test history: `doc/CLAUDE-LOCAL-LOGIN.md`.
+
 ## 3. M1 priority 1 — the desktop release
 
 1. **Tauri shell**: launch the *built* server as a loopback sidecar with an embedded database, wait for health, load the SPA, stop the sidecar on quit. Tauri, not Electron — this repo already contains Rust.
@@ -41,6 +43,7 @@ Then, in order: prove **S3** containment; measure **M2 retrofit sizing** and **u
 
 - Keep the **server + SPA monolith** — desktop is a shell, not a fork. One API client with a configurable base URL.
 - Port **3100 stays loopback-only**; never expose it.
+- **Keep Claude host-login adoption.** Do not re-introduce `const isolated = true;` in `useLocalAiLogin`, and keep `allowHostClaude` wired for `local_trusted` instances. Keep the tests in `doc/CLAUDE-LOCAL-LOGIN.md` §5 green when touching local AI sign-in.
 - Never commit credentials or tokens; never print the instance env file or `PAPERCLIP_AGENT_JWT_SECRET`.
 - **Do not decide B1–B9 in code** (telemetry, announcements, npm/update channel, brand depth, Paperclip Cloud, auth route/exposure, backup retention + DR set, migration vs fresh, baseline re-pin) — they are Board decisions, listed in `doc/plans/2026-09-30-m0-board-decision-packet.md`.
 - **Do not vendor Multica code** — its licence conditions travel with it, and it would not integrate with this TypeScript stack. Reimplement patterns.
