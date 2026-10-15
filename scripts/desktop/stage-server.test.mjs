@@ -38,17 +38,20 @@ function fixture(t, { serverUi = true, rootName = 'fixture' } = {}) {
   write(repo, 'server/dist/index.js', 'server entry');
   write(repo, 'server/package.json', JSON.stringify({
     name: '@paperclipai/server',
+    publishConfig: { files: ['dist', 'ui-dist', 'skills'], exports: { './main': './dist/index.js' } },
     dependencies: { '@paperclipai/alpha': 'workspace:*', 'external-package': '^1.0.0' },
     optionalDependencies: { '@paperclipai/server-helper': 'workspace:*' },
     devDependencies: { '@paperclipai/dev-only': 'workspace:*' },
   }, null, 2));
   write(repo, 'desktop/sidecar/entry.mjs', "import '../app/server/dist/index.js';\n");
+  write(repo, 'desktop/sidecar/db-template-seed.mjs', 'export const seedDatabaseFromTemplate = () => {};\n');
   if (serverUi) write(repo, 'server/ui-dist/index.html', '<main>ui</main>');
   else write(repo, 'ui/dist/index.html', '<main>ui fallback</main>');
   write(repo, 'server/skills/README.md', 'skills');
   write(repo, 'server/dist/types.d.ts', 'server declaration stays');
   write(repo, 'server/dist/index.js.map', 'server map stays');
   packageAt(repo, 'packages/alpha', '@paperclipai/alpha', {
+    publishConfig: { files: ['dist'], exports: { '.': './dist/index.js' } },
     dependencies: { '@paperclipai/beta': 'workspace:*', 'outside-map': '^1.0.0' },
     devDependencies: { '@paperclipai/dev-only': 'workspace:*' },
     peerDependencies: { '@paperclipai/peer-only': 'workspace:*' },
@@ -60,10 +63,13 @@ function fixture(t, { serverUi = true, rootName = 'fixture' } = {}) {
   write(repo, 'packages/alpha/coverage/coverage.json', '{}');
   write(repo, 'packages/alpha/build.tsbuildinfo', '{}');
   packageAt(repo, 'packages/adapters/beta', '@paperclipai/beta', {
+    publishConfig: { files: ['dist'], exports: { '.': './dist/index.js' } },
     optionalDependencies: { '@paperclipai/server-helper': 'workspace:*' },
     dependencies: { '@paperclipai/ignored-recursive': 'workspace:*' },
   });
-  packageAt(repo, 'packages/server-helper', '@paperclipai/server-helper');
+  packageAt(repo, 'packages/server-helper', '@paperclipai/server-helper', {
+    publishConfig: { files: ['dist'], exports: { '.': './dist/index.js' } },
+  });
   packageAt(repo, 'packages/dev-only', '@paperclipai/dev-only');
   packageAt(repo, 'packages/peer-only', '@paperclipai/peer-only');
   const modules = path.join(prodModules, '');
@@ -80,7 +86,7 @@ function fixture(t, { serverUi = true, rootName = 'fixture' } = {}) {
 }
 
 function opts(f, extra = {}) {
-  return { repo: f.repo, prodModules: f.prodModules, out: f.out, now: FIXED_NOW, ...extra };
+  return { repo: f.repo, prodModules: f.prodModules, out: f.out, now: FIXED_NOW, loader: 'tsx', ...extra };
 }
 
 function treeCounts(root) {
@@ -129,6 +135,7 @@ test('stages a self-contained layout with a stable, valid manifest and transitiv
   assert.equal(fs.readFileSync(path.join(f.out, 'app/server/dist/index.js'), 'utf8'), 'server entry');
   assert.equal(fs.readFileSync(path.join(f.out, 'app/server/ui-dist/index.html'), 'utf8'), '<main>ui</main>');
   assert.equal(fs.readFileSync(path.join(f.out, 'sidecar/entry.mjs'), 'utf8'), "import '../app/server/dist/index.js';\n");
+  assert.equal(fs.readFileSync(path.join(f.out, 'sidecar/db-template-seed.mjs'), 'utf8'), 'export const seedDatabaseFromTemplate = () => {};\n');
   assert.equal(fs.readFileSync(path.join(f.out, 'app/node_modules/tsx/dist/loader.mjs'), 'utf8'), 'loader');
   assert.equal(manifest.pathBudget.installPrefixLength, 60);
   assert.equal(fs.readFileSync(path.join(f.out, 'app/node_modules/@paperclipai/alpha/src/index.ts'), 'utf8').includes('@paperclipai/alpha'), true);
@@ -146,6 +153,15 @@ test('stages a self-contained layout with a stable, valid manifest and transitiv
   const onDisk = JSON.parse(fs.readFileSync(path.join(f.out, 'stage-manifest.json'), 'utf8'));
   assert.deepEqual(onDisk, manifest);
   assert.equal((await verifyStage(f.out)).ok, true);
+});
+
+test('stage verification rejects a missing sidecar import dependency', async (t) => {
+  const f = fixture(t);
+  await stageServer(opts(f));
+  fs.rmSync(path.join(f.out, 'sidecar/db-template-seed.mjs'));
+  const result = await verifyStage(f.out);
+  assert.equal(result.ok, false);
+  assert.match(result.problems.join('\n'), /sidecar database-template seed module/);
 });
 
 test('prunes production declarations and maps only, records stable counts, and keeps workspace/server files', async (t) => {
@@ -464,6 +480,76 @@ test('manifest bytes are identical on repeated runs with fixed inputs and time',
   await stageServer(opts(f, { force: true }));
   const second = fs.readFileSync(path.join(f.out, 'stage-manifest.json'));
   assert.deepEqual(second, first);
+});
+
+test('loader none is the default and stages materialized publish files only', async (t) => {
+  const f = fixture(t);
+  const manifest = await stageServer({ ...opts(f), loader: undefined });
+  assert.equal(manifest.loader, 'none');
+  const alpha = path.join(f.out, 'app/node_modules/@paperclipai/alpha');
+  assert.equal(fs.existsSync(path.join(alpha, 'src')), false);
+  assert.equal(fs.existsSync(path.join(alpha, 'dist/index.js')), true);
+  const alphaManifest = JSON.parse(fs.readFileSync(path.join(alpha, 'package.json'), 'utf8'));
+  assert.equal('publishConfig' in alphaManifest, false);
+  assert.deepEqual(alphaManifest.exports, { '.': './dist/index.js' });
+  assert.equal(fs.existsSync(path.join(f.out, 'app/node_modules/tsx')), false);
+  assert.equal((await verifyStage(f.out)).ok, true);
+});
+
+test('loader none tolerates missing optional files-list entries', async (t) => {
+  const f = fixture(t);
+  const alphaPackage = path.join(f.repo, 'packages/alpha/package.json');
+  const pkg = JSON.parse(fs.readFileSync(alphaPackage, 'utf8'));
+  pkg.publishConfig.files = ['dist', 'skills'];
+  fs.writeFileSync(alphaPackage, JSON.stringify(pkg));
+
+  const manifest = await stageServer({ ...opts(f), loader: 'none' });
+  const alpha = path.join(f.out, 'app/node_modules/@paperclipai/alpha');
+  assert.equal(manifest.loader, 'none');
+  assert.equal(fs.existsSync(path.join(alpha, 'dist/index.js')), true);
+  assert.equal(fs.existsSync(path.join(alpha, 'skills')), false);
+  assert.equal((await verifyStage(f.out)).ok, true);
+});
+
+test('loader none rejects TypeScript and missing materialized export targets', async (t) => {
+  const f = fixture(t);
+  const alphaPackage = path.join(f.repo, 'packages/alpha/package.json');
+  let pkg = JSON.parse(fs.readFileSync(alphaPackage, 'utf8'));
+  pkg.publishConfig.exports = { '.': './dist/index.ts' };
+  fs.writeFileSync(alphaPackage, JSON.stringify(pkg));
+  await assert.rejects(stageServer({ ...opts(f), loader: 'none' }), /TypeScript export target.*\.ts/);
+  fs.rmSync(f.out, { recursive: true, force: true });
+  pkg.publishConfig.exports = { '.': './dist/missing.js' };
+  fs.writeFileSync(alphaPackage, JSON.stringify(pkg));
+  await assert.rejects(stageServer({ ...opts(f), loader: 'none' }), /Missing export target.*dist\/missing\.js/);
+
+  fs.rmSync(f.out, { recursive: true, force: true });
+  delete pkg.publishConfig.exports;
+  pkg.publishConfig.main = './dist/missing-main.js';
+  fs.writeFileSync(alphaPackage, JSON.stringify(pkg));
+  await assert.rejects(stageServer({ ...opts(f), loader: 'none' }), /Missing export target.*dist\/missing-main\.js/);
+
+  fs.rmSync(f.out, { recursive: true, force: true });
+  delete pkg.publishConfig.main;
+  pkg.publishConfig.bin = { alpha: './dist/missing-bin.ts' };
+  fs.writeFileSync(alphaPackage, JSON.stringify(pkg));
+  await assert.rejects(stageServer({ ...opts(f), loader: 'none' }), /TypeScript export target.*missing-bin\.ts/);
+});
+
+test('loader none resolves workspace imports throughout staged dist trees without a loader', async (t) => {
+  const f = fixture(t);
+  write(f.repo, 'packages/alpha/dist/index.js', "import '@paperclipai/beta/missing';\n");
+  await assert.rejects(stageServer({ ...opts(f), loader: 'none' }), /Staged workspace import resolution failed without a loader/);
+});
+
+test('tsx fallback retains source staging and requires its loader', async (t) => {
+  const f = fixture(t);
+  const manifest = await stageServer({ ...opts(f), loader: 'tsx' });
+  assert.equal(manifest.loader, 'tsx');
+  assert.equal(fs.existsSync(path.join(f.out, 'app/node_modules/@paperclipai/alpha/src/index.ts')), true);
+  assert.equal(fs.existsSync(path.join(f.out, 'app/node_modules/tsx/dist/loader.mjs')), true);
+  fs.rmSync(path.join(f.prodModules, 'tsx/dist/loader.mjs'));
+  await assert.rejects(stageServer({ ...opts(f), loader: 'tsx', force: true }), /Missing production tsx loader/);
 });
 
 test('pins the requested Node runtime artifacts', () => {

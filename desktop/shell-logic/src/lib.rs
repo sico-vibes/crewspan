@@ -1,15 +1,107 @@
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 pub const SERVER_PORT: u16 = 3100;
 pub const SERVER_URL: &str = "http://127.0.0.1:3100/";
+
+pub fn startup_ready_timeout(
+    existing_default_database: bool,
+    seed_recovery_pending: bool,
+) -> Duration {
+    if existing_default_database && !seed_recovery_pending {
+        Duration::from_secs(300)
+    } else {
+        Duration::from_secs(900)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CloseAction {
+    Hide,
+    Ignore,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TrayAction {
+    Open,
+    Quit,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ServerMonitorDecision {
+    KeepRunning,
+    RestartPrompt,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ServerRecoveryAction {
+    Restart,
+    Quit,
+}
+
+pub fn server_monitor_decision(sidecar_running: bool) -> ServerMonitorDecision {
+    if sidecar_running {
+        ServerMonitorDecision::KeepRunning
+    } else {
+        ServerMonitorDecision::RestartPrompt
+    }
+}
+
+pub fn server_recovery_action(restart_requested: bool, quitting: bool) -> ServerRecoveryAction {
+    if restart_requested && !quitting {
+        ServerRecoveryAction::Restart
+    } else {
+        ServerRecoveryAction::Quit
+    }
+}
+
+pub fn close_action(shutdown_started: bool) -> CloseAction {
+    if shutdown_started {
+        CloseAction::Ignore
+    } else {
+        CloseAction::Hide
+    }
+}
+
+pub fn tray_action(menu_id: &str) -> Option<TrayAction> {
+    match menu_id {
+        "open" => Some(TrayAction::Open),
+        "quit" => Some(TrayAction::Quit),
+        _ => None,
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StagePaths {
     pub node: PathBuf,
     pub tsx_loader: PathBuf,
+    pub manifest: PathBuf,
     pub sidecar_entry: PathBuf,
     pub server_entry: PathBuf,
+    pub db_template: PathBuf,
     pub working_dir: PathBuf,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LoaderMode {
+    None,
+    Tsx,
+}
+
+pub fn loader_from_manifest(json: &str) -> LoaderMode {
+    match serde_json::from_str::<serde_json::Value>(json)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("loader")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+        })
+        .as_deref()
+    {
+        Some("none") => LoaderMode::None,
+        _ => LoaderMode::Tsx,
+    }
 }
 
 /// Build the staged runtime paths. `windows` controls the executable suffix so
@@ -34,8 +126,10 @@ pub fn stage_paths(stage_dir: &Path, windows: bool) -> StagePaths {
             .join("runtime")
             .join(if windows { "node.exe" } else { "node" }),
         tsx_loader: stage_dir.join("app/node_modules/tsx/dist/loader.mjs"),
+        manifest: stage_dir.join("stage-manifest.json"),
         sidecar_entry: stage_dir.join("sidecar/entry.mjs"),
         server_entry: stage_dir.join("app/server/dist/index.js"),
+        db_template: stage_dir.join("db-template"),
         working_dir: stage_dir.to_path_buf(),
     }
 }
@@ -105,6 +199,8 @@ mod tests {
         );
         assert_eq!(paths.sidecar_entry, root.join("sidecar/entry.mjs"));
         assert_eq!(paths.server_entry, root.join("app/server/dist/index.js"));
+        assert_eq!(paths.db_template, root.join("db-template"));
+        assert_eq!(paths.manifest, root.join("stage-manifest.json"));
         assert_eq!(paths.working_dir, root);
     }
 
@@ -160,5 +256,71 @@ mod tests {
     fn loopback_constants_are_stable() {
         assert_eq!(SERVER_PORT, 3100);
         assert_eq!(SERVER_URL, "http://127.0.0.1:3100/");
+    }
+
+    #[test]
+    fn dead_sidecar_requests_recovery_and_live_sidecar_continues() {
+        assert_eq!(
+            server_monitor_decision(true),
+            ServerMonitorDecision::KeepRunning
+        );
+        assert_eq!(
+            server_monitor_decision(false),
+            ServerMonitorDecision::RestartPrompt
+        );
+    }
+
+    #[test]
+    fn restart_choice_restarts_unless_shutdown_has_started() {
+        assert_eq!(
+            server_recovery_action(true, false),
+            ServerRecoveryAction::Restart
+        );
+        assert_eq!(
+            server_recovery_action(false, false),
+            ServerRecoveryAction::Quit
+        );
+        assert_eq!(
+            server_recovery_action(true, true),
+            ServerRecoveryAction::Quit
+        );
+    }
+
+    #[test]
+    fn seed_recovery_uses_first_run_startup_deadline() {
+        assert_eq!(startup_ready_timeout(true, true), Duration::from_secs(900));
+        assert_eq!(startup_ready_timeout(true, false), Duration::from_secs(300));
+        assert_eq!(
+            startup_ready_timeout(false, false),
+            Duration::from_secs(900)
+        );
+    }
+
+    #[test]
+    fn loader_mode_uses_manifest_and_falls_back_to_tsx() {
+        assert_eq!(
+            loader_from_manifest(r#"{"loader":"none"}"#),
+            LoaderMode::None
+        );
+        assert_eq!(loader_from_manifest(r#"{"loader":"tsx"}"#), LoaderMode::Tsx);
+        assert_eq!(loader_from_manifest(""), LoaderMode::Tsx);
+        assert_eq!(loader_from_manifest("not json"), LoaderMode::Tsx);
+        assert_eq!(
+            loader_from_manifest(r#"{"schemaVersion":1}"#),
+            LoaderMode::Tsx
+        );
+    }
+
+    #[test]
+    fn close_hides_unless_shutdown_has_started() {
+        assert_eq!(close_action(false), CloseAction::Hide);
+        assert_eq!(close_action(true), CloseAction::Ignore);
+    }
+
+    #[test]
+    fn tray_menu_ids_map_to_open_and_quit() {
+        assert_eq!(tray_action("open"), Some(TrayAction::Open));
+        assert_eq!(tray_action("quit"), Some(TrayAction::Quit));
+        assert_eq!(tray_action("unknown"), None);
     }
 }

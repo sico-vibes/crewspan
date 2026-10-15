@@ -1,0 +1,9 @@
+[
+  "Using embedded PostgreSQL because no DATABASE_URL set",
+  "Embedded PostgreSQL cluster already exists",
+  "Detected first-run embedded PostgreSQL setup",
+  "Applying ",
+  "Embedded PostgreSQL ready",
+  "Server listener bound on",
+  "Server startup recovery complete"
+]

@@ -4,7 +4,11 @@ use crate::{
     error::SidecarError,
     health::{parse_health_response, HealthParse},
     logs::{drain_stderr, drain_stdout, Logger, Tail},
-    protocol::{generate_nonce, parse_error_line, parse_ready_line, path_url, ReadyParse},
+    phase::{classify_line, StartupPhase, StartupProgress},
+    protocol::{
+        generate_nonce, parse_error_line, parse_ready_line, parse_timing_line, path_url,
+        ReadyParse, StartupTiming,
+    },
 };
 use std::{
     collections::VecDeque,
@@ -12,7 +16,10 @@ use std::{
     net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
-    sync::{mpsc, Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc, Arc, Mutex,
+    },
     thread::JoinHandle,
     time::{Duration, Instant},
 };
@@ -39,6 +46,7 @@ macro_rules! kill_failed_start {
 macro_rules! kill_failed_start {
     ($child:expr, $drains:expr, $job:expr) => {{
         let _ = stringify!($job);
+        kill_unix_process_group($child.id());
         kill_and_join($child, $drains);
     }};
 }
@@ -78,7 +86,34 @@ pub struct Sidecar {
 
 impl Sidecar {
     pub fn start(config: SidecarConfig) -> Result<Self, SidecarError> {
+        Self::start_with_progress(config, &mut |_| {})
+    }
+
+    pub fn start_with_progress(
+        config: SidecarConfig,
+        on_progress: &mut dyn FnMut(StartupProgress),
+    ) -> Result<Self, SidecarError> {
+        Self::start_cancellable(config, &AtomicBool::new(false), on_progress)
+    }
+
+    pub fn start_cancellable(
+        config: SidecarConfig,
+        cancel: &AtomicBool,
+        on_progress: &mut dyn FnMut(StartupProgress),
+    ) -> Result<Self, SidecarError> {
+        if cancel.load(Ordering::SeqCst) {
+            return Err(SidecarError::Cancelled);
+        }
         preflight_port(config.port)?;
+        let started = Instant::now();
+        let mut phase = StartupPhase::Launching;
+        let mut detail = None;
+        let mut timing = StartupTiming::default();
+        on_progress(StartupProgress {
+            phase,
+            elapsed: Duration::ZERO,
+            detail,
+        });
         let nonce = generate_nonce();
         let environment = build_environment(&config, &nonce);
         let env_values = crate::logs::secret_env_values(&environment);
@@ -86,9 +121,12 @@ impl Sidecar {
             Logger::new(&config.log_dir, &nonce, &env_values).map_err(|e| SidecarError::Io {
                 message: format!("Could not open sidecar log ({})", safe_io_kind(&e)),
             })?;
+        logger.timing_phase(phase.label(), started.elapsed().as_millis());
         let mut command = Command::new(&config.node_path);
+        if let Some(loader) = &config.tsx_loader {
+            command.args(["--import", &path_url(loader)]);
+        }
         command
-            .args(["--import", &path_url(&config.tsx_loader)])
             .arg(&config.entry_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -103,6 +141,11 @@ impl Sidecar {
             use std::os::windows::process::CommandExt;
             command.creation_flags(0x08000000);
         }
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            command.process_group(0);
+        }
         let mut child = command.spawn().map_err(|e| SidecarError::SpawnFailed {
             message: format!("Could not start the local runtime ({})", safe_io_kind(&e)),
         })?;
@@ -116,6 +159,7 @@ impl Sidecar {
         let (tx, rx) = mpsc::sync_channel(8);
         let stderr_tx = tx.clone();
         let tail: Tail = Arc::new(Mutex::new(VecDeque::with_capacity(50)));
+        let progress_logger = logger.clone();
         let drains = vec![
             drain_stdout(
                 child.stdout.take().expect("piped stdout"),
@@ -129,9 +173,12 @@ impl Sidecar {
                 stderr_tx,
             ),
         ];
-        let started = Instant::now();
         let deadline = started + config.ready_timeout;
-        let ready = loop {
+        let (ready, ready_ms) = loop {
+            if cancel.load(Ordering::SeqCst) {
+                kill_failed_start!(&mut child, drains, job);
+                return Err(SidecarError::Cancelled);
+            }
             if let Some(status) = child.try_wait().map_err(|e| SidecarError::Io {
                 message: format!("Could not inspect sidecar process ({})", safe_io_kind(&e)),
             })? {
@@ -153,6 +200,15 @@ impl Sidecar {
             }
             match rx.recv_timeout(remaining.min(Duration::from_millis(100))) {
                 Ok(line) => {
+                    update_startup_progress(
+                        &line,
+                        started,
+                        &progress_logger,
+                        on_progress,
+                        &mut phase,
+                        &mut detail,
+                        &mut timing,
+                    );
                     if let Some(error) = parse_error_line(&line) {
                         kill_failed_start!(&mut child, drains, job);
                         return Err(error);
@@ -174,7 +230,7 @@ impl Sidecar {
                                     actual: port,
                                 });
                             }
-                            break (port, ready_pid);
+                            break ((port, ready_pid), started.elapsed().as_millis());
                         }
                     }
                 }
@@ -185,7 +241,21 @@ impl Sidecar {
         let _reported_pid = ready.1;
         let mut last_status = None;
         loop {
-            for _line in rx.try_iter() {}
+            if cancel.load(Ordering::SeqCst) {
+                kill_failed_start!(&mut child, drains, job);
+                return Err(SidecarError::Cancelled);
+            }
+            for line in rx.try_iter() {
+                update_startup_progress(
+                    &line,
+                    started,
+                    &progress_logger,
+                    on_progress,
+                    &mut phase,
+                    &mut detail,
+                    &mut timing,
+                );
+            }
             if let Some(status) = child.try_wait().map_err(|e| SidecarError::Io {
                 message: format!("Could not inspect sidecar process ({})", safe_io_kind(&e)),
             })? {
@@ -207,13 +277,35 @@ impl Sidecar {
                 });
             }
             match check_health(config.port) {
-                Ok(HealthParse::Ok) => break,
+                Ok(HealthParse::Ok) => {
+                    progress_logger.timing_summary(
+                        ready_ms,
+                        started.elapsed().as_millis(),
+                        &timing,
+                    );
+                    break;
+                }
                 Ok(HealthParse::Starting) => last_status = Some("starting".into()),
                 Ok(HealthParse::Other(s)) => last_status = Some(s),
                 Ok(HealthParse::Unparseable) | Err(()) => last_status = Some("unparseable".into()),
             }
-            for _line in rx.try_iter() {}
-            std::thread::sleep(config.health_poll_interval.min(remaining));
+            for line in rx.try_iter() {
+                update_startup_progress(
+                    &line,
+                    started,
+                    &progress_logger,
+                    on_progress,
+                    &mut phase,
+                    &mut detail,
+                    &mut timing,
+                );
+            }
+            std::thread::sleep(
+                config
+                    .health_poll_interval
+                    .min(remaining)
+                    .min(Duration::from_millis(100)),
+            );
         }
         Ok(Self {
             child,
@@ -278,6 +370,8 @@ impl Sidecar {
             }
             #[cfg(not(windows))]
             {
+                #[cfg(unix)]
+                kill_unix_process_group(self.child.id());
                 let _ = self.child.kill();
             }
         }
@@ -292,6 +386,39 @@ impl Sidecar {
         } else {
             StopOutcome::Forced
         }
+    }
+}
+
+fn update_startup_progress(
+    line: &str,
+    started: Instant,
+    logger: &Logger,
+    callback: &mut dyn FnMut(StartupProgress),
+    phase: &mut StartupPhase,
+    detail: &mut Option<u32>,
+    timing: &mut StartupTiming,
+) {
+    if let Some(signal) = classify_line(line) {
+        let next = signal.advance(*phase);
+        let changed = next != *phase;
+        let detail_changed = signal.detail.is_some() && signal.detail != *detail;
+        *phase = next;
+        if signal.detail.is_some() {
+            *detail = signal.detail;
+        }
+        if changed {
+            logger.timing_phase(phase.label(), started.elapsed().as_millis());
+        }
+        if changed || detail_changed {
+            callback(StartupProgress {
+                phase: *phase,
+                elapsed: started.elapsed(),
+                detail: *detail,
+            });
+        }
+    }
+    if let Some(parsed) = parse_timing_line(line) {
+        *timing = parsed;
     }
 }
 
@@ -348,6 +475,12 @@ fn kill_and_join(child: &mut Child, drains: Vec<JoinHandle<()>>) {
     let _ = child.kill();
     let _ = child.wait();
     join_drains(drains);
+}
+#[cfg(unix)]
+fn kill_unix_process_group(pid: u32) {
+    let _ = Command::new("kill")
+        .args(["-KILL", "--", &format!("-{pid}")])
+        .status();
 }
 fn safe_io_kind(error: &std::io::Error) -> &'static str {
     match error.kind() {

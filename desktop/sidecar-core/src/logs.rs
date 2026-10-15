@@ -99,6 +99,28 @@ impl Logger {
             let _ = writeln!(file, "[{stream}] {safe}");
         }
     }
+
+    pub(crate) fn timing_phase(&self, phase: &str, at_ms: u128) {
+        self.write("timing", &format!("phase={phase} at_ms={at_ms}"));
+    }
+
+    pub(crate) fn timing_summary(
+        &self,
+        ready_ms: u128,
+        health_ok_ms: u128,
+        timing: &crate::protocol::StartupTiming,
+    ) {
+        self.write(
+            "timing",
+            &format!(
+                "summary ready_ms={ready_ms} health_ok_ms={health_ok_ms} node_boot_ms={} seed_ms={} import_ms={} start_server_ms={}",
+                timing.node_boot_ms.unwrap_or_default(),
+                timing.seed_ms.unwrap_or_default(),
+                timing.import_ms.unwrap_or_default(),
+                timing.start_server_ms.unwrap_or_default(),
+            ),
+        );
+    }
 }
 
 pub(crate) fn drain_stdout(

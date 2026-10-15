@@ -15,6 +15,7 @@
       "webviewInstallMode": { "type": "embedBootstrapper" },
       "nsis": {
         "installMode": "currentUser",
+        "compression": "zlib",
         "languages": ["English"]
       }
     }

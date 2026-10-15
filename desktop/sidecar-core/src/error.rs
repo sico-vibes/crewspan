@@ -34,6 +34,7 @@ pub enum SidecarError {
         message: String,
     },
     ShutdownTimeout,
+    Cancelled,
 }
 
 impl SidecarError {
@@ -50,6 +51,7 @@ impl SidecarError {
             Self::HealthTimeout { .. } => "health_timeout",
             Self::Io { .. } => "io",
             Self::ShutdownTimeout => "shutdown_timeout",
+            Self::Cancelled => "cancelled",
         }
     }
 
@@ -65,6 +67,7 @@ impl SidecarError {
             Self::StartFailed { .. } => "Crewspan's local server failed to start. Try restarting the app.".into(),
             Self::Io { .. } => "Crewspan could not access a required local resource. Check available disk space and permissions.".into(),
             Self::ShutdownTimeout => "Crewspan's local server did not stop cleanly and was forced to close.".into(),
+            Self::Cancelled => "Crewspan startup was cancelled.".into(),
         }
     }
 }
@@ -87,6 +90,7 @@ impl fmt::Display for SidecarError {
             Self::HealthTimeout { .. } => f.write_str("Sidecar health check timed out"),
             Self::Io { .. } => f.write_str("Sidecar I/O failed"),
             Self::ShutdownTimeout => f.write_str("Sidecar shutdown timed out"),
+            Self::Cancelled => f.write_str("Sidecar startup was cancelled"),
         }
     }
 }

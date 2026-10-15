@@ -5,6 +5,7 @@ mod env;
 mod error;
 mod health;
 mod logs;
+mod phase;
 mod process;
 mod protocol;
 
@@ -12,6 +13,7 @@ pub use config::SidecarConfig;
 pub use env::{build_environment, environment_name_is_blocked};
 pub use error::SidecarError;
 pub use health::{parse_health_response, HealthParse};
+pub use phase::{classify_line, PhaseSignal, StartupPhase, StartupProgress};
 pub use process::{preflight_port, Sidecar, StopOutcome};
 pub use protocol::{
     generate_nonce, parse_error_line, parse_ready_line, path_to_file_url, ReadyParse,
@@ -24,7 +26,7 @@ mod tests {
     fn config() -> SidecarConfig {
         SidecarConfig::new(
             "n".into(),
-            "t".into(),
+            Some("t".into()),
             "e".into(),
             "w".into(),
             "d".into(),
@@ -43,6 +45,10 @@ mod tests {
             ("PAPERCLIP_TELEMETRY_DISABLED".into(), "true".into()),
             ("DATABASE_URL".into(), "fake-db".into()),
             ("SAFE".into(), "yes".into()),
+            (
+                "CREWSPAN_SIDECAR_DB_TEMPLATE".into(),
+                "inherited-path".into(),
+            ),
         ];
         let env = build_environment(&c, "nonce");
         assert!(env.windows(2).all(|w| w[0].0 <= w[1].0));
@@ -52,6 +58,7 @@ mod tests {
         assert!(env.contains(&("DO_NOT_TRACK".into(), "1".into())));
         assert!(env.contains(&("PAPERCLIP_TELEMETRY_DISABLED".into(), "true".into())));
         assert!(env.contains(&("HOST".into(), "127.0.0.1".into())));
+        assert!(env.contains(&("CREWSPAN_SIDECAR_DB_TEMPLATE".into(), "off".into())));
         assert!(!env
             .iter()
             .any(|(k, _)| k == "PAPERCLIP_SECRET" || k == "DATABASE_URL"));
@@ -66,12 +73,37 @@ mod tests {
             true
         ));
     }
+    #[test]
+    fn configured_database_template_overrides_the_inherited_environment() {
+        let mut c = config();
+        c.db_template = Some(PathBuf::from("/bundle/stage/db-template"));
+        c.inherited_env = vec![(
+            "CREWSPAN_SIDECAR_DB_TEMPLATE".into(),
+            "inherited-path".into(),
+        )];
+        assert!(build_environment(&c, "nonce").contains(&(
+            "CREWSPAN_SIDECAR_DB_TEMPLATE".into(),
+            "/bundle/stage/db-template".into()
+        )));
+    }
 
     #[test]
     fn preflight_rejects_port_zero_without_binding() {
         assert!(matches!(
             preflight_port(0),
             Err(SidecarError::InvalidEnvironment { .. })
+        ));
+    }
+
+    #[test]
+    fn cancelled_start_returns_before_spawning() {
+        use std::sync::atomic::AtomicBool;
+
+        let cancel = AtomicBool::new(true);
+        let mut callback = |_| {};
+        assert!(matches!(
+            Sidecar::start_cancellable(config(), &cancel, &mut callback),
+            Err(SidecarError::Cancelled)
         ));
     }
     #[test]

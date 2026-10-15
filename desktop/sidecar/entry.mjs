@@ -2,6 +2,8 @@ import { randomBytes, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import * as module from "node:module";
+import { seedDatabaseFromTemplate } from "./db-template-seed.mjs";
 
 const ERROR_PREFIX = "CREWSPAN_SIDECAR_ERROR ";
 const READY_PREFIX = "CREWSPAN_SIDECAR_READY ";
@@ -10,6 +12,7 @@ const SECRET_KEYS = [
   "PAPERCLIP_TOOL_ACTION_SIGNING_SECRET",
 ];
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 45_000;
+const entryStarted = process.uptime() * 1_000;
 
 function writeLine(stream, line) {
   return new Promise((resolve) => stream.write(`${line}\n`, resolve));
@@ -291,11 +294,30 @@ async function main() {
 
   const handlers = installShutdownHandlers(config.shutdownTimeoutMs);
   try {
+    const seedStarted = performance.now();
+    await writeLine(process.stdout, `CREWSPAN_SIDECAR_PHASE ${JSON.stringify({ phase: "seed_database", elapsedMs: 0 })}`);
+    const templateResult = seedDatabaseFromTemplate({
+      home: process.env.PAPERCLIP_HOME,
+      instanceId: process.env.PAPERCLIP_INSTANCE_ID || "desktop",
+      configPath: config.configPath,
+      templateDir: process.env.CREWSPAN_SIDECAR_DB_TEMPLATE || "off",
+    });
+    const seedMs = Math.round(performance.now() - seedStarted);
     ensureSecrets(config.configPath);
+    await writeLine(process.stdout, `CREWSPAN_SIDECAR_PHASE ${JSON.stringify({ phase: "load_server", elapsedMs: seedMs })}`);
+    const compileCache = typeof process.env.PAPERCLIP_HOME === "string"
+      ? module.enableCompileCache?.(path.join(process.env.PAPERCLIP_HOME, "cache", "node-compile"))
+      : undefined;
+    if (compileCache) await writeLine(process.stdout, `CREWSPAN_SIDECAR_COMPILE_CACHE ${compileCache.status}`);
     const serverUrl = pathToFileURL(path.resolve(config.serverEntry)).href;
+    const importStarted = performance.now();
     const serverModule = await import(serverUrl);
+    const importMs = Math.round(performance.now() - importStarted);
     if (typeof serverModule.startServer !== "function") throw new Error("Server module does not export startServer()");
+    await writeLine(process.stdout, `CREWSPAN_SIDECAR_PHASE ${JSON.stringify({ phase: "start_server", elapsedMs: importMs })}`);
+    const startServerStarted = performance.now();
     const started = await serverModule.startServer();
+    const startServerMs = Math.round(performance.now() - startServerStarted);
     handlers.setStarted(started);
 
     if (handlers.hasPendingShutdown()) {
@@ -315,7 +337,16 @@ async function main() {
     }
 
     if (!await handlers.markReady()) return;
-    await writeLine(process.stdout, `${READY_PREFIX}${JSON.stringify({ nonce: config.nonce, port: started.listenPort, pid: process.pid })}`);
+    const timingLine = `CREWSPAN_SIDECAR_TIMING ${JSON.stringify({
+      nodeBootMs: Math.max(0, Math.round(entryStarted)),
+      seedMs,
+      importMs,
+      startServerMs,
+      template: templateResult.template,
+    })}`;
+    const readyLine = `${READY_PREFIX}${JSON.stringify({ nonce: config.nonce, port: started.listenPort, pid: process.pid })}`;
+    await writeLine(process.stdout, `${timingLine}\n${readyLine}`);
+    if (templateResult.pendingPath) fs.rmSync(templateResult.pendingPath, { force: true });
   } catch (error) {
     await writeLine(process.stderr, `${ERROR_PREFIX}${JSON.stringify({ code: "start_failed", message: safeMessage(error) })}`);
     process.exit(1);

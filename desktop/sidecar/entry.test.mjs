@@ -6,6 +6,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createHash } from "node:crypto";
+import { seedDatabaseFromTemplate } from "./db-template-seed.mjs";
 
 const entryPath = fileURLToPath(new URL("./entry.mjs", import.meta.url));
 const READY_PREFIX = "CREWSPAN_SIDECAR_READY ";
@@ -124,26 +126,138 @@ function readState(run) {
 }
 
 function readyPayload(output) {
-  const lines = output.trimEnd().split(/\r?\n/);
-  assert.equal(lines.length, 1, "expected exactly one stdout line");
-  assert.ok(lines[0].startsWith(READY_PREFIX));
+  const lines = output.trimEnd().split(/\r?\n/).filter((line) => line.startsWith(READY_PREFIX));
+  assert.equal(lines.length, 1, "expected exactly one READY line");
   return JSON.parse(lines[0].slice(READY_PREFIX.length));
 }
 
 test("success emits one valid READY line with nonce, port, and pid", async () => {
-  const run = await fixture();
+  const seededFakeSecret = "fake-seeded-secret-value-2026";
+  const run = await fixture({ env: { PAPERCLIP_AGENT_JWT_SECRET: seededFakeSecret } });
   await waitForOutput(run, "ready");
   const payload = readyPayload(run.stdout);
   assert.deepEqual(payload, { nonce: "test-nonce-4f3a", port: 3100, pid: run.child.pid });
+  assert.match(run.stdout, /CREWSPAN_SIDECAR_PHASE \{"phase":"seed_database","elapsedMs":0\}/);
+  assert.match(run.stdout, /CREWSPAN_SIDECAR_PHASE \{"phase":"load_server","elapsedMs":\d+\}/);
+  assert.match(run.stdout, /CREWSPAN_SIDECAR_PHASE \{"phase":"start_server","elapsedMs":\d+\}/);
+  const timingLine = run.stdout.split(/\r?\n/).find((line) => line.startsWith("CREWSPAN_SIDECAR_TIMING "));
+  assert.ok(timingLine);
+  assert.deepEqual(Object.keys(JSON.parse(timingLine.slice("CREWSPAN_SIDECAR_TIMING ".length))).sort(), [
+    "importMs", "nodeBootMs", "seedMs", "startServerMs", "template",
+  ]);
+  assert.ok(!/[/\\]|SECRET|test-nonce/.test(timingLine));
+  assert.ok(!run.stdout.includes(seededFakeSecret));
   assert.equal(await finish(run), 0);
   assert.equal(readState(run).shutdownCalls, 1);
+});
+
+function seedFixture() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "crewspan-db-seed-"));
+  const home = path.join(root, "home");
+  const instanceRoot = path.join(home, "instances", "desktop");
+  const configPath = path.join(instanceRoot, "config.json");
+  const templateDir = path.join(root, "template");
+  const sourceDb = path.join(templateDir, "db");
+  fs.mkdirSync(path.join(sourceDb, "global"), { recursive: true });
+  fs.writeFileSync(path.join(sourceDb, "PG_VERSION"), "18\n");
+  fs.writeFileSync(path.join(sourceDb, "global", "pg_control"), "fake-control");
+  const files = ["PG_VERSION", "global/pg_control"];
+  const bytes = files.reduce((total, file) => total + fs.statSync(path.join(sourceDb, file)).size, 0);
+  fs.writeFileSync(path.join(templateDir, "template-manifest.json"), JSON.stringify({
+    schemaVersion: 1,
+    platform: `${process.platform}-${process.arch}`,
+    files,
+    bytes,
+    pgControlSha256: createHash("sha256").update(fs.readFileSync(path.join(sourceDb, "global", "pg_control"))).digest("hex"),
+  }));
+  const seed = (overrides = {}) => seedDatabaseFromTemplate({
+    home,
+    instanceId: "desktop",
+    configPath,
+    templateDir,
+    ...overrides,
+  });
+  return { root, home, instanceRoot, configPath, templateDir, sourceDb, seed };
+}
+
+test("database template seeding uses a verified copy and creates a pending marker", () => {
+  const fixture = seedFixture();
+  fs.mkdirSync(path.join(fixture.instanceRoot, "db"), { recursive: true });
+  fs.mkdirSync(path.join(fixture.instanceRoot, ".db-seed-stale"), { recursive: true });
+  const result = fixture.seed();
+  assert.deepEqual(result, { template: "used", pendingPath: path.join(fixture.instanceRoot, ".db-seed-pending") });
+  assert.equal(fs.existsSync(path.join(fixture.instanceRoot, "db", "PG_VERSION")), true);
+  assert.equal(fs.existsSync(result.pendingPath), true);
+  assert.equal(fs.existsSync(path.join(fixture.instanceRoot, ".db-seed-stale")), false);
+  assert.equal(fs.existsSync(fixture.configPath), false, "seeding never creates config.json");
+});
+
+test("database template skip and recovery rules preserve existing data", async (t) => {
+  await t.test("disabled and absent templates", () => {
+    const fixture = seedFixture();
+    assert.deepEqual(fixture.seed({ templateDir: "off" }), { template: "disabled" });
+    assert.deepEqual(fixture.seed({ templateDir: path.join(fixture.root, "missing") }), { template: "absent" });
+  });
+  await t.test("existing database and config", () => {
+    const existingDb = seedFixture();
+    fs.mkdirSync(path.join(existingDb.instanceRoot, "db"), { recursive: true });
+    fs.writeFileSync(path.join(existingDb.instanceRoot, "db", "user-data"), "keep");
+    assert.deepEqual(existingDb.seed(), { template: "skipped:existing_data" });
+    assert.equal(fs.readFileSync(path.join(existingDb.instanceRoot, "db", "user-data"), "utf8"), "keep");
+    const existingConfig = seedFixture();
+    fs.mkdirSync(existingConfig.instanceRoot, { recursive: true });
+    fs.writeFileSync(existingConfig.configPath, "{}");
+    assert.deepEqual(existingConfig.seed(), { template: "skipped:existing_config" });
+  });
+  await t.test("platform mismatch and corrupt template", () => {
+    const mismatch = seedFixture();
+    assert.deepEqual(mismatch.seed({ platform: "other", arch: "other" }), { template: "skipped:platform_mismatch" });
+    const corrupt = seedFixture();
+    fs.rmSync(path.join(corrupt.sourceDb, "PG_VERSION"));
+    assert.deepEqual(corrupt.seed(), { template: "skipped:missing_file" });
+    const running = seedFixture();
+    fs.writeFileSync(path.join(running.sourceDb, "postmaster.pid"), "123\n");
+    assert.deepEqual(running.seed(), { template: "skipped:postmaster_pid" });
+  });
+  await t.test("copy failure and rename race take the slow path", () => {
+    const failedCopy = seedFixture();
+    const copyFailingFs = { ...fs, cpSync() { throw new Error("copy failure"); } };
+    assert.deepEqual(failedCopy.seed({ fsApi: copyFailingFs }), { template: "rejected:copy_or_rename" });
+    assert.equal(fs.existsSync(path.join(failedCopy.instanceRoot, "db")), false);
+    const raced = seedFixture();
+    const racingFs = {
+      ...fs,
+      renameSync(from, to) {
+        if (to === path.join(raced.instanceRoot, "db")) {
+          fs.mkdirSync(to, { recursive: true });
+          fs.writeFileSync(path.join(to, "racing-data"), "keep");
+        }
+        return fs.renameSync(from, to);
+      },
+    };
+    assert.deepEqual(raced.seed({ fsApi: racingFs }), { template: "rejected:copy_or_rename" });
+    assert.equal(fs.readFileSync(path.join(raced.instanceRoot, "db", "racing-data"), "utf8"), "keep");
+  });
+  await t.test("seed-pending recovery moves the database aside", () => {
+    const pending = seedFixture();
+    const dbDir = path.join(pending.instanceRoot, "db");
+    fs.mkdirSync(dbDir, { recursive: true });
+    fs.writeFileSync(path.join(dbDir, "PG_VERSION"), "bad but preserved");
+    fs.writeFileSync(path.join(pending.instanceRoot, ".db-seed-pending"), "seeded\n");
+    assert.deepEqual(pending.seed(), { template: "skipped:seed_pending_recovery" });
+    assert.equal(fs.existsSync(dbDir), false);
+    const moved = fs.readdirSync(pending.instanceRoot).find((name) => name.startsWith(".db.failed-seed-"));
+    assert.ok(moved);
+    assert.equal(fs.readFileSync(path.join(pending.instanceRoot, moved, "PG_VERSION"), "utf8"), "bad but preserved");
+    assert.equal(fs.existsSync(path.join(pending.instanceRoot, ".db-seed-pending")), false);
+  });
 });
 
 test("port mismatch shuts down, exits 64, and never emits READY", async () => {
   const run = await fixture({ env: { FAKE_LISTEN_PORT: "3101" } });
   const { code } = await waitForClose(run);
   assert.equal(code, 64);
-  assert.equal(run.stdout, "");
+  assert.equal(run.stdout.includes(READY_PREFIX), false);
   assert.deepEqual(JSON.parse(run.stderr.slice(ERROR_PREFIX.length)), {
     code: "port_mismatch", requested: 3100, actual: 3101,
   });
@@ -159,7 +273,7 @@ test("port mismatch shutdown timeout still exits 64 with port_mismatch", async (
   const { code, elapsedMs } = await waitForClose(run);
   assert.equal(code, 64);
   assert.ok(elapsedMs < 1_000);
-  assert.equal(run.stdout, "");
+  assert.equal(run.stdout.includes(READY_PREFIX), false);
   assert.deepEqual(JSON.parse(run.stderr.slice(ERROR_PREFIX.length)), {
     code: "port_mismatch", requested: 3100, actual: 3101,
   });
@@ -175,7 +289,7 @@ test("pre-ready EOF bounds a hanging shutdown and exits 70 without READY", async
   const { code, elapsedMs } = await waitForClose(run);
   assert.equal(code, 70);
   assert.ok(elapsedMs < 1_000);
-  assert.equal(run.stdout, "");
+  assert.equal(run.stdout.includes(READY_PREFIX), false);
   assert.equal(run.stderr, `${ERROR_PREFIX}{"code":"shutdown_timeout"}\n`);
   assert.equal(readState(run).shutdownCalls, 1);
 });
@@ -343,7 +457,7 @@ test("start failure while stdin is already closed exits 1 with start_failed", as
   const run = await fixture({ closeStdinImmediately: true, env: { FAKE_START_MODE: "throw" } });
   const { code } = await waitForClose(run);
   assert.equal(code, 1);
-  assert.equal(run.stdout, "");
+  assert.equal(run.stdout.includes(READY_PREFIX), false);
   assert.ok(run.stderr.startsWith(ERROR_PREFIX));
   assert.deepEqual(JSON.parse(run.stderr.slice(ERROR_PREFIX.length)), {
     code: "start_failed", message: "fake startup failure",
